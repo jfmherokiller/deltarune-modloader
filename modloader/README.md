@@ -22,6 +22,7 @@ DELTARUNE\
   version.dll
   mods\
     modloader.ini          optional settings
+    load_order.txt         optional explicit load order (see below)
     modloader.log          written by the loader
     MyMod\
       chapter1_windows\lang\lang_en.json    ← replaces the game's file
@@ -30,9 +31,18 @@ DELTARUNE\
     _DisabledMod\          ← '_' or '.' prefix = ignored
 ```
 
+* **Load order** is deterministic. Mods named in `mods\load_order.txt` (one folder name per
+  line, `#` comments, case-insensitive) load first, in that order. Every other enabled mod
+  follows alphabetically by folder name (ordinal, case-insensitive, the same on every
+  machine and locale). **Later mods win**: file overrides and full `.gml` replacements come
+  from the last mod that has them, and patches are applied in this order, each on top of the
+  previous. `modloader.log` prints the final order (`mod #0`, `#1`, …), and names in
+  `load_order.txt` that aren't installed are logged and ignored. Within one mod,
+  `all_chapters\` applies before `chapterN_windows\`, and files are processed in name
+  order. `mods\native\*.dll` also load alphabetically.
 * **File overrides**: any file the runner reads through `ReadEntireFile` from inside
   the install folder can be replaced by the same relative path under
-  `mods\<Mod>\`. Mods load in alphabetical order, and the last one wins. This covers
+  `mods\<Mod>\`. The last mod in the load order wins. This covers
   each chapter's `data.win`, `lang\*.json`, `options.ini`, and `audiogroup*.dat`.
   Loose `.ogg` music/SFX is **not** covered yet, because it's streamed by another reader.
 * **Script redirects** (`redirects.txt`): `target = substitute`, one per line, `#` comments.

@@ -13,6 +13,9 @@
 //                                       (embedded into data.win, default audio group)
 //   code\<gml_CodeName>.gml             replace / create code (UTMT naming)
 // Sprites and sounds are imported first so GML can reference new asset names.
+// Order is deterministic: roots in DR_MOD_DIRS order (the loader's load order: load_order.txt,
+// then alphabetical; all_chapters before the chapter folder), files inside a root sorted by
+// name (ordinal, case-insensitive). Later roots win full replacements; patches stack in order.
 using System;
 using System.IO;
 using System.Linq;
@@ -45,7 +48,7 @@ foreach (string root in roots)
     string sd = Path.Combine(root, "sprites");
     if (Directory.Exists(sd))
     {
-        foreach (string f in Directory.GetFiles(sd, "*.png", SearchOption.AllDirectories))
+        foreach (string f in Directory.GetFiles(sd, "*.png", SearchOption.AllDirectories).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
         {
             var m = frameRx.Match(Path.GetFileNameWithoutExtension(f));
             if (!m.Success) { Console.WriteLine($"[DR] WARN sprite file without _<frame>: {f} (skipped)"); continue; }
@@ -53,7 +56,7 @@ foreach (string root in roots)
                 spriteFrames[m.Groups[1].Value] = frames = new SortedDictionary<int, string>();
             frames[int.Parse(m.Groups[2].Value)] = f;
         }
-        foreach (string f in Directory.GetFiles(sd, "*.origin.txt", SearchOption.AllDirectories))
+        foreach (string f in Directory.GetFiles(sd, "*.origin.txt", SearchOption.AllDirectories).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
         {
             var p = File.ReadAllText(f).Split(new[] { ' ', ',', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
             if (p.Length >= 2) spriteOrigins[Path.GetFileName(f)[..^".origin.txt".Length]] = (int.Parse(p[0]), int.Parse(p[1]));
@@ -61,7 +64,7 @@ foreach (string root in roots)
     }
     string snd = Path.Combine(root, "sounds");
     if (Directory.Exists(snd))
-        foreach (string f in Directory.GetFiles(snd))
+        foreach (string f in Directory.GetFiles(snd).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             if (f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
                 sounds[Path.GetFileNameWithoutExtension(f)] = f;
     string cd = Path.Combine(root, "code");
@@ -89,7 +92,7 @@ void ImportSprites()
     var images = new List<(string sprite, int frame, MagickImage img)>();
     try
     {
-        foreach (var (name, frames) in spriteFrames)
+        foreach (var (name, frames) in spriteFrames.OrderBy(k => k.Key, StringComparer.Ordinal))
             foreach (var (frame, path) in frames)
             {
                 var img = new MagickImage(path);
@@ -99,7 +102,8 @@ void ImportSprites()
 
         // simple shelf packer, 2 px padding, pages up to 2048x2048
         const int PAGE = 2048, PAD = 2;
-        var order = images.OrderByDescending(i => i.img.Height).ThenByDescending(i => i.img.Width).ToList();
+        var order = images.OrderByDescending(i => i.img.Height).ThenByDescending(i => i.img.Width)
+                          .ThenBy(i => i.sprite, StringComparer.Ordinal).ThenBy(i => i.frame).ToList();
         var pages = new List<List<(int x, int y, (string sprite, int frame, MagickImage img) item)>>();
         var cur = new List<(int, int, (string, int, MagickImage))>();
         int cx = 0, cy = 0, rowH = 0;
@@ -207,7 +211,7 @@ if (sounds.Count > 0)
 {
     int builtin = Data.GetBuiltinSoundGroupID();
     var builtinGroup = Data.AudioGroups.Count > 0 ? Data.AudioGroups[builtin] : null;
-    foreach (var (name, path) in sounds)
+    foreach (var (name, path) in sounds.OrderBy(k => k.Key, StringComparer.Ordinal))
     {
         bool isOgg = path.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase);
         var audio = new UndertaleEmbeddedAudio { Data = File.ReadAllBytes(path) };

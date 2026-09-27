@@ -93,8 +93,6 @@ static void W2U(const WCHAR* w, char* out, int n)
 }
 
 /* ------------------------------------------------------------------ mods scan */
-static int CmpModName(const void* a, const void* b) { return _wcsicmp((const WCHAR*)a, (const WCHAR*)b); }
-
 static void TrimA(char* s)
 {
     char* e = s + strlen(s);
@@ -102,6 +100,57 @@ static void TrimA(char* s)
     char* b = s; while (*b == ' ' || *b == '\t') b++;
     if (b != s) memmove(s, b, strlen(b) + 1);
 }
+
+/* Load order: deterministic and locale-independent. Mods listed in mods\load_order.txt come
+ * first, in file order; every other mod follows in alphabetical order (ordinal, case-
+ * insensitive). Later mods win conflicts (file overrides, full .gml replacements) and their
+ * patches are applied on top of earlier ones. */
+static int CmpName(const WCHAR* a, const WCHAR* b)
+{
+    int r = CompareStringOrdinal(a, -1, b, -1, TRUE);
+    if (r == CSTR_EQUAL) r = CompareStringOrdinal(a, -1, b, -1, FALSE);   /* tie-break on case */
+    return r - CSTR_EQUAL;
+}
+static int CmpModName(const void* a, const void* b) { return CmpName((const WCHAR*)a, (const WCHAR*)b); }
+
+/* Reorders the (alphabetically sorted) g_ModNames by mods\load_order.txt: one mod folder
+ * name per line, '#' comments, blank lines ignored, case-insensitive; names that aren't
+ * installed/enabled are logged and skipped. Unlisted mods keep alphabetical order after
+ * the listed ones. Returns how many mods were placed by the file. */
+static int ApplyLoadOrderFile(void)
+{
+    static WCHAR sorted[MAX_MODS][MAX_PATH];
+    static char used[MAX_MODS];
+    WCHAR path[MAX_PATH];
+    _snwprintf(path, MAX_PATH, L"%s\\load_order.txt", g_ModsDir);
+    FILE* f = _wfopen(path, L"rb");
+    if (!f) return 0;
+    memset(used, 0, sizeof used);
+    int n = 0;
+    char line[MAX_PATH * 3];
+    while (fgets(line, sizeof line, f)) {
+        char* hash = strchr(line, '#'); if (hash) *hash = 0;
+        TrimA(line);
+        char* s = line;
+        if ((unsigned char)s[0] == 0xEF && (unsigned char)s[1] == 0xBB && (unsigned char)s[2] == 0xBF) s += 3; /* BOM */
+        if (!s[0]) continue;
+        WCHAR w[MAX_PATH];
+        if (!MultiByteToWideChar(CP_UTF8, 0, s, -1, w, MAX_PATH)) continue;
+        int found = -1;
+        for (int i = 0; i < g_ModCount; i++)
+            if (!used[i] && CompareStringOrdinal(w, -1, g_ModNames[i], -1, TRUE) == CSTR_EQUAL) { found = i; break; }
+        if (found < 0) { Log("load_order.txt: '%s' is not an enabled mod folder, ignored", s); continue; }
+        used[found] = 1;
+        wcscpy(sorted[n++], g_ModNames[found]);
+    }
+    fclose(f);
+    int listed = n;
+    for (int i = 0; i < g_ModCount; i++)
+        if (!used[i]) wcscpy(sorted[n++], g_ModNames[i]);
+    memcpy(g_ModNames, sorted, sizeof g_ModNames[0] * g_ModCount);
+    return listed;
+}
+
 
 static void LoadRedirects(int mod)
 {
@@ -138,12 +187,15 @@ static void ScanMods(void)
     do {
         if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
         if (fd.cFileName[0] == L'.' || fd.cFileName[0] == L'_') continue;
-        if (!_wcsicmp(fd.cFileName, L"native") || !_wcsicmp(fd.cFileName, L"aurie")) continue; /* Aurie folders */
+        if (!_wcsicmp(fd.cFileName, L"native") || !_wcsicmp(fd.cFileName, L"aurie") ||
+            !_wcsicmp(fd.cFileName, L"tools")) continue;   /* Aurie folders, compiler */
         if (g_ModCount >= MAX_MODS) break;
         wcsncpy(g_ModNames[g_ModCount++], fd.cFileName, MAX_PATH - 1);
     } while (FindNextFileW(h, &fd));
     FindClose(h);
     qsort(g_ModNames, g_ModCount, sizeof g_ModNames[0], CmpModName);
+    int listed = ApplyLoadOrderFile();
+    Log("load order: %d mod(s), %d from load_order.txt, rest alphabetical; later mods win", g_ModCount, listed);
     for (int i = 0; i < g_ModCount; i++) {
         char n[MAX_PATH * 3]; W2U(g_ModNames[i], n, sizeof n);
         int before = g_RedirectCount;
@@ -455,6 +507,7 @@ static BOOL WINAPI HookedCreateProcessW(LPCWSTR app, LPWSTR cmd, LPSECURITY_ATTR
  * entry-point trampoline does, without patching DELTARUNE.exe. */
 static int LoadNativeMods(int dry_run)
 {
+    static WCHAR names[MAX_MODS][MAX_PATH];
     int count = 0;
     WCHAR pattern[MAX_PATH], path[MAX_PATH];
     _snwprintf(pattern, MAX_PATH, L"%s\\native\\*.dll", g_ModsDir);
@@ -463,15 +516,20 @@ static int LoadNativeMods(int dry_run)
     if (h == INVALID_HANDLE_VALUE) return 0;
     do {
         if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
-        count++;
-        if (dry_run) continue;
-        _snwprintf(path, MAX_PATH, L"%s\\native\\%s", g_ModsDir, fd.cFileName);
-        HMODULE m = LoadLibraryW(path);
-        char n[MAX_PATH * 3]; W2U(fd.cFileName, n, sizeof n);
-        if (m) Log("native mod loaded: %s at %p", n, (void*)m);
-        else   Log("native mod FAILED: %s (error %lu)", n, GetLastError());
+        if (fd.cFileName[0] == L'_' || fd.cFileName[0] == L'.') continue;
+        if (count >= MAX_MODS) break;
+        wcsncpy(names[count++], fd.cFileName, MAX_PATH - 1);
     } while (FindNextFileW(h, &fd));
     FindClose(h);
+    if (dry_run) return count;
+    qsort(names, count, sizeof names[0], CmpModName);   /* alphabetical, filesystem-independent */
+    for (int i = 0; i < count; i++) {
+        _snwprintf(path, MAX_PATH, L"%s\\native\\%s", g_ModsDir, names[i]);
+        HMODULE m = LoadLibraryW(path);
+        char n[MAX_PATH * 3]; W2U(names[i], n, sizeof n);
+        if (m) Log("native mod loaded: %s at %p", n, (void*)m);
+        else   Log("native mod FAILED: %s (error %lu)", n, GetLastError());
+    }
     return count;
 }
 
