@@ -1,0 +1,28 @@
+# build output
+modloader/build/
+modloader/yytk_plugin/build/
+*.obj
+*.exp
+*.lib
+*.pdb
+*.ilk
+
+# prebuilt third-party binaries: shipped via GitHub Releases, not git
+modloader/third_party/aurie_bin/
+
+# decompiled game code (Toby Fox's copyrighted GML) and bundled tools
+RE/code/
+RE/tools/
+
+# local-only
+modloader/test_logs/
+__pycache__/
+*.pyc
+*.i64
+*.id0
+*.id1
+*.id2
+*.nam
+*.til
+data.win
+*.xdelta

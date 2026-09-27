@@ -1,0 +1,4 @@
+[submodule "external/YYToolkit"]
+	path = external/YYToolkit
+	url = https://github.com/jfmherokiller/YYToolkit.git
+	branch = fix/vm-room-data-non-inlined
