@@ -39,6 +39,7 @@ var spriteFrames = new Dictionary<string, SortedDictionary<int, string>>(StringC
 var spriteOrigins = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
 var sounds = new Dictionary<string, string>(StringComparer.Ordinal);
 var gml = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+var patchFiles = new List<string>();
 foreach (string root in roots)
 {
     string sd = Path.Combine(root, "sprites");
@@ -65,10 +66,19 @@ foreach (string root in roots)
                 sounds[Path.GetFileNameWithoutExtension(f)] = f;
     string cd = Path.Combine(root, "code");
     if (Directory.Exists(cd))
-        foreach (string f in Directory.GetFiles(cd, "*.gml"))
-            gml[Path.GetFileNameWithoutExtension(f)] = f;
+        foreach (string f in Directory.GetFiles(cd).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+        {
+            string fn = Path.GetFileName(f);
+            if (fn.EndsWith(".append.gml", StringComparison.OrdinalIgnoreCase) ||
+                fn.EndsWith(".prepend.gml", StringComparison.OrdinalIgnoreCase) ||
+                fn.EndsWith(".patch", StringComparison.OrdinalIgnoreCase) ||
+                fn.EndsWith(".diff", StringComparison.OrdinalIgnoreCase))
+                patchFiles.Add(f);                                   // applied in mod order
+            else if (fn.EndsWith(".gml", StringComparison.OrdinalIgnoreCase))
+                gml[Path.GetFileNameWithoutExtension(f)] = f;        // later mod wins
+        }
 }
-Console.WriteLine($"[DR] {roots.Count} mod root(s): {spriteFrames.Count} sprite(s), {sounds.Count} sound(s), {gml.Count} GML file(s)");
+Console.WriteLine($"[DR] {roots.Count} mod root(s): {spriteFrames.Count} sprite(s), {sounds.Count} sound(s), {gml.Count} GML file(s), {patchFiles.Count} patch file(s)");
 
 // ---------------------------------------------------------------- sprites
 if (spriteFrames.Count > 0)
@@ -225,7 +235,7 @@ if (sounds.Count > 0)
     Console.WriteLine($"[DR] sounds OK ({sounds.Count})");
 }
 
-// ---------------------------------------------------------------- code
+// ---------------------------------------------------------------- code: full replacements
 if (gml.Count > 0)
 {
     var group = new UndertaleModLib.Compiler.CodeImportGroup(Data) { AutoCreateAssets = true };
@@ -239,6 +249,177 @@ if (gml.Count > 0)
     }
     Console.WriteLine($"[DR] code OK ({gml.Count})");
 }
+
+// ---------------------------------------------------------------- code: patches
+// Applied after all full replacements, in mod load order, against the *current* code
+// (so a patch stacks on top of another mod's replacement). Formats:
+//   <entry>.append.gml / <entry>.prepend.gml   add code at the end / start
+//   <entry>.patch     blocks:  >>> find | >>> find regex | >>> find first
+//                              <old lines>
+//                              >>> replace
+//                              <new lines>
+//                              >>> end
+//                     find matches whole lines, ignoring indentation; all matches
+//                     are replaced unless "find first". Lines outside blocks are ignored.
+//   <entry>.diff or any .diff with "+++ b/<entry>.gml" headers (git diff output):
+//                     each hunk's context/- lines are found (indentation-insensitive,
+//                     line numbers ignored) and swapped for its context/+ lines.
+//                     "+++ b/x.gml" with "--- /dev/null" creates the entry.
+int patchFail = 0, patchOk = 0;
+if (patchFiles.Count > 0)
+{
+    foreach (string pf in patchFiles)
+    {
+        string fn = Path.GetFileName(pf);
+        string modTag = pf.Replace('\\', '/');
+        try
+        {
+            var edits = ParsePatchFile(pf);   // entry -> list of edits (in order)
+            foreach (var (entry, ops) in edits)
+            {
+                var code = Data.Code.ByName(entry);
+                string src;
+                if (code is null)
+                {
+                    if (!ops.All(o => o.Kind == "create" || o.Kind == "append" || o.Kind == "prepend"))
+                        throw new Exception($"code entry {entry} does not exist");
+                    src = "";
+                }
+                else if (code.ParentEntry is not null)
+                    throw new Exception($"{entry} is a child entry; patch its parent {code.ParentEntry.Name.Content}");
+                else
+                    src = new Underanalyzer.Decompiler.DecompileContext(new GlobalDecompileContext(Data), code, Data.ToolInfo.DecompilerSettings).DecompileToString();
+                src = src.Replace("\r\n", "\n");
+                foreach (var op in ops) src = ApplyEdit(src, op, entry);
+                var g = new UndertaleModLib.Compiler.CodeImportGroup(Data) { AutoCreateAssets = true };
+                g.QueueReplace(entry, src);
+                var r = g.Import(false);
+                if (!r.Successful) throw new Exception("compile failed after patching:\n" + r.PrintAllErrors(true));
+                patchOk++;
+            }
+            Console.WriteLine($"[DR] patch OK  {modTag}");
+        }
+        catch (Exception ex)
+        {
+            patchFail++;
+            Console.WriteLine($"[DR] WARN patch FAILED {modTag}: {ex.Message}");
+        }
+    }
+    Console.WriteLine($"[DR] patches: {patchOk} entr(y/ies) patched, {patchFail} file(s) failed (skipped)");
+}
+
+record Edit(string Kind, string Find, string Replace, bool All = true);
+
+Dictionary<string, List<Edit>> ParsePatchFile(string path)
+{
+    var res = new Dictionary<string, List<Edit>>(StringComparer.Ordinal);
+    void Add(string e, Edit ed) { if (!res.TryGetValue(e, out var l)) res[e] = l = new(); l.Add(ed); }
+    string fn = Path.GetFileName(path);
+    string text = File.ReadAllText(path).Replace("\r\n", "\n");
+    if (fn.EndsWith(".append.gml", StringComparison.OrdinalIgnoreCase))
+    { Add(fn[..^".append.gml".Length], new Edit("append", null, text)); return res; }
+    if (fn.EndsWith(".prepend.gml", StringComparison.OrdinalIgnoreCase))
+    { Add(fn[..^".prepend.gml".Length], new Edit("prepend", null, text)); return res; }
+
+    var lines = text.Split('\n');
+    if (fn.EndsWith(".patch", StringComparison.OrdinalIgnoreCase))
+    {
+        string entry = Path.GetFileNameWithoutExtension(fn);
+        int i = 0, blocks = 0;
+        while (i < lines.Length)
+        {
+            string h = lines[i].Trim();
+            if (!h.StartsWith(">>> find", StringComparison.OrdinalIgnoreCase)) { i++; continue; }
+            string mode = h.Substring(8).Trim().ToLowerInvariant();
+            var find = new List<string>(); var repl = new List<string>();
+            i++;
+            while (i < lines.Length && !lines[i].Trim().Equals(">>> replace", StringComparison.OrdinalIgnoreCase)) find.Add(lines[i++]);
+            if (i >= lines.Length) throw new Exception($"{fn}: '>>> find' without '>>> replace'");
+            i++;
+            while (i < lines.Length && !lines[i].Trim().Equals(">>> end", StringComparison.OrdinalIgnoreCase)) repl.Add(lines[i++]);
+            if (i >= lines.Length) throw new Exception($"{fn}: '>>> replace' without '>>> end'");
+            i++;
+            Add(entry, new Edit(mode == "regex" ? "regex" : "find", string.Join("\n", find), string.Join("\n", repl), mode != "first"));
+            blocks++;
+        }
+        if (blocks == 0) throw new Exception($"{fn}: no '>>> find' blocks");
+        return res;
+    }
+
+    // unified diff
+    string target = Path.GetFileNameWithoutExtension(fn);
+    bool fromNull = false;
+    List<string> hf = null, hr = null;
+    void Flush()
+    {
+        if (hf is null) return;
+        if (fromNull) Add(target, new Edit("create", null, string.Join("\n", hr)));
+        else Add(target, new Edit("find", string.Join("\n", hf), string.Join("\n", hr), false));
+        hf = hr = null;
+    }
+    foreach (string raw in lines)
+    {
+        if (raw.StartsWith("diff ") || raw.StartsWith("index ")) { Flush(); continue; }
+        if (raw.StartsWith("--- ")) { Flush(); fromNull = raw.Contains("/dev/null"); continue; }
+        if (raw.StartsWith("+++ "))
+        {
+            string p = raw.Substring(4).Trim();
+            int tab = p.IndexOf('\t'); if (tab >= 0) p = p[..tab];
+            if (p != "/dev/null") target = Path.GetFileNameWithoutExtension(p.Replace('\\', '/').Split('/').Last());
+            continue;
+        }
+        if (raw.StartsWith("@@")) { Flush(); hf = new(); hr = new(); continue; }
+        if (hf is null || raw.StartsWith("\\")) continue;
+        if (raw.Length == 0) { hf.Add(""); hr.Add(""); continue; }
+        char c = raw[0]; string body = raw.Substring(1);
+        if (c == ' ') { hf.Add(body); hr.Add(body); }
+        else if (c == '-') hf.Add(body);
+        else if (c == '+') hr.Add(body);
+    }
+    Flush();
+    if (res.Count == 0) throw new Exception($"{fn}: no hunks");
+    return res;
+}
+
+string ApplyEdit(string src, Edit e, string entry)
+{
+    switch (e.Kind)
+    {
+        case "create": return e.Replace;
+        case "append": return src.TrimEnd('\n') + "\n" + e.Replace;
+        case "prepend": return e.Replace.TrimEnd('\n') + "\n" + src;
+    }
+    Regex rx;
+    if (e.Kind == "regex") rx = new Regex(e.Find, RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    else
+    {
+        var fl = e.Find.Split('\n').ToList();
+        while (fl.Count > 0 && fl[0].Trim().Length == 0) fl.RemoveAt(0);
+        while (fl.Count > 0 && fl[^1].Trim().Length == 0) fl.RemoveAt(fl.Count - 1);
+        if (fl.Count == 0) throw new Exception("empty find block");
+        string pat = "^" + string.Join("\n", fl.Select(l => l.Trim().Length == 0 ? @"[ \t]*" : @"[ \t]*" + Regex.Escape(l.Trim()) + @"[ \t]*")) + @"(?=\n|\z)";
+        rx = new Regex(pat, RegexOptions.Multiline | RegexOptions.CultureInvariant);
+    }
+    int n = rx.Matches(src).Count;
+    if (n == 0)
+    {
+        string first = e.Find.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? "";
+        throw new Exception($"{entry}: find text not found (first line: \"{first}\")");
+    }
+    if (e.Kind == "regex") return rx.Replace(src, e.Replace);
+    string rep = e.Replace;
+    // keep the indentation of the matched first line for the replacement's unindented lines
+    return e.All ? rx.Replace(src, m => Reindent(m.Value, rep)) : rx.Replace(src, m => Reindent(m.Value, rep), 1);
+}
+
+string Reindent(string matched, string rep)
+{
+    string indent = new string(matched.TakeWhile(ch => ch == ' ' || ch == '\t').ToArray());
+    var rl = rep.Split('\n');
+    int common = rl.Where(l => l.Trim().Length > 0).Select(l => l.TakeWhile(ch => ch == ' ' || ch == '\t').Count()).DefaultIfEmpty(0).Min();
+    return string.Join("\n", rl.Select(l => l.Trim().Length == 0 ? "" : indent + l.Substring(Math.Min(common, l.Length))));
+}
+
 Console.WriteLine("[DR] import OK");
 
 // ---------------------------------------------------------------- hand back to the loader

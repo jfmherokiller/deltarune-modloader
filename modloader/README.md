@@ -61,6 +61,39 @@ mods\<Mod>\chapter2_windows\sounds\snd_mynew.ogg                      new sound,
 mods\<Mod>\code\... sprites\... sounds\...                            launcher (root data.win)
 ```
 
+`mods\<Mod>\all_chapters\` has the same layout and is applied to every `chapterN_windows`
+data.win (before that chapter's own folder).
+
+### Patching instead of replacing
+
+Full `.gml` files replace a script entirely (a later mod wins). To change *part* of a script, so that
+several mods can touch the same one, put a patch next to it in `code\`. Patches are applied
+after all full replacements, in mod load order, on top of whatever the script is at that
+point (decompiled with UTMT):
+
+| File | Effect |
+|---|---|
+| `<entry>.append.gml` | code added at the end |
+| `<entry>.prepend.gml` | code added at the start |
+| `<entry>.patch` | `>>> find` / `>>> replace` / `>>> end` blocks (see below) |
+| `*.diff` | `git diff` / unified diff output against decompiled GML (`+++ b/<entry>.gml`) |
+
+```
+>>> find
+if (quit_timer >= 1)
+>>> replace
+draw_text(8, 452, "hello");
+if (quit_timer >= 1)
+>>> end
+```
+
+`find` matches whole lines and ignores indentation. Every match is replaced; use `>>> find first` for only the first,
+or `>>> find regex` for a .NET regex. Diff hunks are matched the same way (context and `-` lines, with
+line numbers ignored), so a diff made against one UTMT decompile still applies after other mods
+have shifted lines. `--- /dev/null` creates a new entry. A patch whose text isn't found
+is skipped with a `WARN` in `mods\modloader.gml.log`; everything else still loads.
+Example: `mods_examples/CheatMenu`.
+
 When the game reads a `data.win` that any enabled mod has loose assets for, the loader
 runs UTMT's own library (`mods\tools\ImportLooseMod.csx`) on the vanilla file, applying
 all mods in load order (a later mod wins on the same name). Sprites and sounds are imported

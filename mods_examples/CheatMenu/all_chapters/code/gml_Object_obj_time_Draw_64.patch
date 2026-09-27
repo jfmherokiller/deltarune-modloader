@@ -1,0 +1,15 @@
+// CheatMenu .patch example: show a hint for the first ~5 s after launch.
+// Stacks on top of any other mod's version of this script.
+>>> find
+if (quit_timer >= 1)
+>>> replace
+if (global.time < 300)
+{
+    draw_set_alpha(clamp((300 - global.time) / 60, 0, 1));
+    draw_set_color(c_white);
+    scr_84_set_draw_font("main");
+    draw_text(8, 452, "CheatMenu: press F7");
+    draw_set_alpha(1);
+}
+if (quit_timer >= 1)
+>>> end

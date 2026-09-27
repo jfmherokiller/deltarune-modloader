@@ -833,10 +833,14 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
             new `spr_cheat_icon` created. Test mod lives at `mods\AssetTest` (game folder only).
       - [ ] Streamed audio (`.ogg` beside data.win / `mus\`) doesn't go through ReadEntireFile:
             find the audio-engine open path in IDA and redirect it for loose music overrides.
-      - [ ] Example mod: in-game cheat menu. Overworld: new entry in the C-menu CONFIG list
-            (`obj_darkcontroller` menuno 5 / submenu 30, Step_0 ~L217 + Draw_0 ~L50; LMP already
-            adds "Mod Configuration" as submenu 105). Battle: extra ACT option or a free key
-            opening an overlay.
+      - [x] Patch files (2026-09-27): `<entry>.append.gml`, `.prepend.gml`, `.patch` (find/replace
+            blocks, indentation-insensitive) and `.diff` (unified/git diff), applied after full
+            replacements in mod order; failing patches are skipped with a WARN. `all_chapters\`
+            folder applies to every chapter.
+      - [x] Example mod `mods_examples/CheatMenu`: F7 overlay (new object obj_drcheat, spawned by an
+            append patch on obj_time Step_1; new sprite + sound). Compiles in Ch1-5 and with LMP;
+            verified in Ch2 overworld (open, edit MAG, close, walk). 
+      - [ ] CheatMenu: test inside a battle (freeze via instance_deactivate_all during bullet phase).
       - [ ] Per-script runtime swap (follow-up, per user): compile a single .gml and
             replace that `CCode`'s `VMBuffer` live, with no full-file recompile. First
             needs runtime registration of new variable/string ids (IDA).

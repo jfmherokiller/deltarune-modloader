@@ -4,6 +4,7 @@ Tools for modding the Steam release of **DELTARUNE** (GameMaker VM runner, x64, 
 
 | Folder | What |
 |---|---|
+| [`mods_examples/`](mods_examples/) | Example mods: `CheatMenu` (F7 in-game cheat overlay; new object/sprite/sound + patch files) |
 | [`modloader/`](modloader/README.md) | `version.dll` proxy mod loader. It handles loose-file overrides, **loose `.gml` script replacement** (no xdelta, and `data.win` is never modified), script redirects, and loads Aurie + YYToolkit (patched for DELTARUNE). |
 | [`modloader/yytk_plugin/`](modloader/yytk_plugin) | Example YYToolkit v5 plugin that reads the room and globals live. |
 | [`modloader/tools/`](modloader/tools) | `ImportGMLFolder.csx` (headless UTMT GML import) and `xdelta_to_gml.py` (convert an xdelta mod into loose GML). |

@@ -225,19 +225,35 @@ static int DirHas(const WCHAR* root, const WCHAR* sub, const WCHAR* mask)
 
 /* Collects mods\<Mod>\<rel_dir> for every enabled mod that has loose assets there:
  * code\*.gml, sprites\*.png or sounds\*.ogg|*.wav. */
+static int HasLooseAssets(const WCHAR* dir)
+{
+    return DirHas(dir, L"code", L"*.gml") || DirHas(dir, L"code", L"*.patch") || DirHas(dir, L"code", L"*.diff") ||
+           DirHas(dir, L"sprites", L"*.png") || DirHas(dir, L"sounds", L"*.ogg") || DirHas(dir, L"sounds", L"*.wav");
+}
+
+/* Collects, per enabled mod in load order: mods\<Mod>\all_chapters (only for chapterN_windows
+ * data.win files) and then mods\<Mod>\<rel_dir>, when they contain loose assets:
+ * code\*.gml|*.patch|*.diff, sprites\*.png or sounds\*.ogg|*.wav. */
 static int CollectGmlDirs(const WCHAR* rel_dir, WCHAR* out, size_t out_n)
 {
     int count = 0;
+    int is_chapter = _wcsnicmp(rel_dir, L"chapter", 7) == 0;
     out[0] = 0;
     for (int i = 0; i < g_ModCount; i++) {
-        WCHAR dir[MAX_PATH * 2];
-        _snwprintf(dir, MAX_PATH * 2, L"%s\\%s\\%s", g_ModsDir, g_ModNames[i], rel_dir);
-        if (!DirHas(dir, L"code", L"*.gml") && !DirHas(dir, L"sprites", L"*.png") &&
-            !DirHas(dir, L"sounds", L"*.ogg") && !DirHas(dir, L"sounds", L"*.wav")) continue;
-        if (wcslen(out) + wcslen(dir) + 2 >= out_n) break;
-        if (out[0]) wcscat(out, L";");
-        wcscat(out, dir);
-        count++;
+        for (int pass = 0; pass < 2; pass++) {
+            WCHAR dir[MAX_PATH * 2];
+            if (pass == 0) {
+                if (!is_chapter) continue;
+                _snwprintf(dir, MAX_PATH * 2, L"%s\\%s\\all_chapters", g_ModsDir, g_ModNames[i]);
+            } else {
+                _snwprintf(dir, MAX_PATH * 2, L"%s\\%s\\%s", g_ModsDir, g_ModNames[i], rel_dir);
+            }
+            if (!HasLooseAssets(dir)) continue;
+            if (wcslen(out) + wcslen(dir) + 2 >= out_n) break;
+            if (out[0]) wcscat(out, L";");
+            wcscat(out, dir);
+            count++;
+        }
     }
     return count;
 }
