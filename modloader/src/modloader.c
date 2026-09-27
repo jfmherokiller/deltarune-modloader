@@ -177,8 +177,10 @@ static int FindOverride(const char* path_utf8, char* out_utf8, int out_n)
     return 0;
 }
 
-/* ------------------------------------------------------------------ loose GML
+/* ------------------------------------------------------------------ loose GML / sprites / sounds
  * mods\<Mod>\<chapter>\code\<gml_CodeName>.gml : decompiled GML (UTMT naming).
+ * mods\<Mod>\<chapter>\sprites\<spr_name>_<frame>.png, sounds\<snd_name>.ogg|.wav :
+ * replaced or new assets (see tools\ImportLooseMod.csx).
  * When the game reads <chapter>\data.win and any enabled mod has such files, the loader
  * runs UTMT's compiler (UndertaleModCli + tools\ImportGMLFolder.csx) on the vanilla
  * data.win, receives the patched bytes over a named pipe and hands them to the game in
@@ -210,19 +212,28 @@ static DWORD WINAPI PipeReader(LPVOID p)
     return 0;
 }
 
-/* Collects mods\<Mod>\<rel_dir>\code for every enabled mod that has *.gml there. */
+static int DirHas(const WCHAR* root, const WCHAR* sub, const WCHAR* mask)
+{
+    WCHAR pat[MAX_PATH * 2];
+    WIN32_FIND_DATAW fd;
+    _snwprintf(pat, MAX_PATH * 2, L"%s\\%s\\%s", root, sub, mask);
+    HANDLE h = FindFirstFileW(pat, &fd);
+    if (h == INVALID_HANDLE_VALUE) return 0;
+    FindClose(h);
+    return 1;
+}
+
+/* Collects mods\<Mod>\<rel_dir> for every enabled mod that has loose assets there:
+ * code\*.gml, sprites\*.png or sounds\*.ogg|*.wav. */
 static int CollectGmlDirs(const WCHAR* rel_dir, WCHAR* out, size_t out_n)
 {
     int count = 0;
     out[0] = 0;
     for (int i = 0; i < g_ModCount; i++) {
-        WCHAR dir[MAX_PATH * 2], pat[MAX_PATH * 2];
-        WIN32_FIND_DATAW fd;
-        _snwprintf(dir, MAX_PATH * 2, L"%s\\%s\\%s\\code", g_ModsDir, g_ModNames[i], rel_dir);
-        _snwprintf(pat, MAX_PATH * 2, L"%s\\*.gml", dir);
-        HANDLE h = FindFirstFileW(pat, &fd);
-        if (h == INVALID_HANDLE_VALUE) continue;
-        FindClose(h);
+        WCHAR dir[MAX_PATH * 2];
+        _snwprintf(dir, MAX_PATH * 2, L"%s\\%s\\%s", g_ModsDir, g_ModNames[i], rel_dir);
+        if (!DirHas(dir, L"code", L"*.gml") && !DirHas(dir, L"sprites", L"*.png") &&
+            !DirHas(dir, L"sounds", L"*.ogg") && !DirHas(dir, L"sounds", L"*.wav")) continue;
         if (wcslen(out) + wcslen(dir) + 2 >= out_n) break;
         if (out[0]) wcscat(out, L";");
         wcscat(out, dir);
@@ -275,11 +286,11 @@ static void* CompileLooseGml(const char* path_utf8, unsigned int* out_size)
     si.dwFlags = STARTF_USESTDHANDLES;
     si.hStdInput = nul; si.hStdOutput = logf; si.hStdError = logf;
     PROCESS_INFORMATION pi = { 0 };
-    SetEnvironmentVariableW(L"DR_GML_DIRS", dirs);
+    SetEnvironmentVariableW(L"DR_MOD_DIRS", dirs);
     SetEnvironmentVariableW(L"DR_OUT_PIPE", pipe_name);
     DWORD t0 = GetTickCount();
     BOOL started = CreateProcessW(NULL, cmd, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL, NULL, &si, &pi);
-    SetEnvironmentVariableW(L"DR_GML_DIRS", NULL);
+    SetEnvironmentVariableW(L"DR_MOD_DIRS", NULL);
     SetEnvironmentVariableW(L"DR_OUT_PIPE", NULL);
     if (logf != INVALID_HANDLE_VALUE) CloseHandle(logf);
     if (nul != INVALID_HANDLE_VALUE) CloseHandle(nul);
@@ -591,7 +602,9 @@ static void Init(void)
         GetPrivateProfileStringW(L"loader", L"utmt_cli", L"", v, MAX_PATH * 2, ini);
         if (v[0]) wcscpy(g_UtmtCli, v);
         else _snwprintf(g_UtmtCli, MAX_PATH * 2, L"%s\\tools\\utmt\\UndertaleModCli.exe", g_ModsDir);
-        _snwprintf(g_ImportScript, MAX_PATH * 2, L"%s\\tools\\ImportGMLFolder.csx", g_ModsDir);
+        _snwprintf(g_ImportScript, MAX_PATH * 2, L"%s\\tools\\ImportLooseMod.csx", g_ModsDir);
+        if (GetFileAttributesW(g_ImportScript) == INVALID_FILE_ATTRIBUTES)   /* older installs */
+            _snwprintf(g_ImportScript, MAX_PATH * 2, L"%s\\tools\\ImportGMLFolder.csx", g_ModsDir);
         g_GmlTimeoutMs = GetPrivateProfileIntW(L"loader", L"gml_timeout_ms", 300000, ini);
     }
 

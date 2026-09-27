@@ -825,6 +825,18 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
       - [ ] Asset changes are not carried: the multiplayer mod drops a few unused
             sprites/objects in Ch2–5, which is harmless, but Ch5 also adds 1 embedded
             texture + 1 sound. Needs loose asset import (sprites/sounds) next to the GML.
+      - [x] Loose sprites + sounds (2026-09-27): `mods\<Mod>\<chapter>\sprites\<spr>_<frame>.png`
+            (+ optional `<spr>.origin.txt`) and `sounds\<snd>.ogg|.wav`, imported by
+            `tools/ImportLooseMod.csx` before the GML (new sprites/sounds are usable from GML).
+            Verified in Ch2 alongside LocalMultiplayer: `spr_heartsmall` recolored green on the
+            file select, `snd_menumove` replaced by an 880 Hz tone (confirmed via WASAPI loopback),
+            new `spr_cheat_icon` created. Test mod lives at `mods\AssetTest` (game folder only).
+      - [ ] Streamed audio (`.ogg` beside data.win / `mus\`) doesn't go through ReadEntireFile:
+            find the audio-engine open path in IDA and redirect it for loose music overrides.
+      - [ ] Example mod: in-game cheat menu. Overworld: new entry in the C-menu CONFIG list
+            (`obj_darkcontroller` menuno 5 / submenu 30, Step_0 ~L217 + Draw_0 ~L50; LMP already
+            adds "Mod Configuration" as submenu 105). Battle: extra ACT option or a free key
+            opening an overlay.
       - [ ] Per-script runtime swap (follow-up, per user): compile a single .gml and
             replace that `CCode`'s `VMBuffer` live, with no full-file recompile. First
             needs runtime registration of new variable/string ids (IDA).

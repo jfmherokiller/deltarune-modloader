@@ -49,29 +49,41 @@ log_files=0     ; 1 = log every file read (research)
 log_scripts=0   ; 1 = log each GML script/event name the first time it runs
 ```
 
-## Loose GML (script replacement without xdelta)
+## Loose GML, sprites and sounds (no xdelta, no rebuilt data.win)
 
 ```
-mods\<Mod>\chapter2_windows\code\gml_GlobalScript_button1_p.gml
-mods\<Mod>\chapter2_windows\code\gml_Object_DEVICE_MENU_Draw_0.gml
-mods\<Mod>\code\...            <- launcher (root data.win)
+mods\<Mod>\chapter2_windows\code\gml_Object_DEVICE_MENU_Draw_0.gml   decompiled GML (UTMT code entry name)
+mods\<Mod>\chapter2_windows\sprites\spr_heart_0.png                   replace frame 0 of spr_heart
+mods\<Mod>\chapter2_windows\sprites\spr_mything_0.png ... _3.png      new sprite (frames from 0, no gaps)
+mods\<Mod>\chapter2_windows\sprites\spr_mything.origin.txt            "x y" origin for a new sprite (default 0 0)
+mods\<Mod>\chapter2_windows\sounds\snd_menumove.ogg                   replace a sound (.ogg or .wav)
+mods\<Mod>\chapter2_windows\sounds\snd_mynew.ogg                      new sound, usable as snd_mynew in GML
+mods\<Mod>\code\... sprites\... sounds\...                            launcher (root data.win)
 ```
 
-Each file is decompiled GML named after its UTMT code entry. When the game reads a
-`data.win` that any enabled mod has `.gml` files for, the loader runs UTMT's own
-compiler on the vanilla file, applying all mods' folders in load order (a later mod
-wins on the same name). It then hands the result to the game from memory. The
-`data.win` on disk is never modified and no patched copy is written. On a compile
-error the game runs vanilla, and the errors go to `mods\modloader.gml.log`.
+When the game reads a `data.win` that any enabled mod has loose assets for, the loader
+runs UTMT's own library (`mods\tools\ImportLooseMod.csx`) on the vanilla file, applying
+all mods in load order (a later mod wins on the same name). Sprites and sounds are imported
+before code, so GML can reference new asset names. The patched data goes to the game
+from memory. The `data.win` on disk is never modified and no patched copy is written. On
+any error the game runs vanilla, and the details go to `mods\modloader.gml.log`.
+
+- Sprite PNGs are packed onto new texture pages. A replaced frame 0 with a different size
+  resizes the sprite. Precise collision masks are regenerated only for sprites that
+  already had one.
+- Sounds are embedded in `data.win` (default audio group) and play through the normal
+  `snd_play`. Streamed music (the `.ogg` files next to `data.win` and in `mus\`) is
+  opened by the audio engine, not `ReadEntireFile`, so it can't be overridden yet.
 
 Needs `mods\tools\utmt\` (UndertaleModTool CLI 0.9.2.0, `UTMT_CLI_*-Windows.zip`) and
-`mods\tools\ImportGMLFolder.csx` (from `tools/`). You can override the CLI path with
-`utmt_cli=` in `modloader.ini` and the timeout with `gml_timeout_ms=` (default 300000).
-Compile time is about 4 s for Ch2 with 216 files.
+`mods\tools\ImportLooseMod.csx` (from `tools/`; `ImportGMLFolder.csx` is the older
+code-only version and is used if `ImportLooseMod.csx` is absent). You can override the CLI
+path with `utmt_cli=` in `modloader.ini` and the timeout with `gml_timeout_ms=` (default 300000).
+Ch2 with 216 GML files plus a few assets takes about 6 s.
 
 **Converting an xdelta mod:** `python tools/xdelta_to_gml.py <game> <ModName>
 chapter2_windows=patch.xdelta ...` keeps only the code entries the patch changed and
-warns about non-code (asset) differences, which loose GML can't carry yet.
+warns about asset differences (export those with UTMT into `sprites\`/`sounds\`).
 
 ## Aurie / YYToolkit
 
