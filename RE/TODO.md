@@ -840,6 +840,11 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
       - [x] Example mod `mods_examples/CheatMenu`: F7 overlay (new object obj_drcheat, spawned by an
             append patch on obj_time Step_1; new sprite + sound). Compiles in Ch1-5 and with LMP;
             verified in Ch2 overworld (open, edit MAG, close, walk). 
+      - [x] LocalMultiplayer v19 → patch form (`tools/gml_to_patches.py`): 25 MB → 4.2 MB (1759 .diff +
+            1053 full .gml); every entry in Ch1-5 decompiles identical to the full mod; Ch2 in-game
+            verified (file select title, C-menu → wrench → Mod Configuration) with CheatMenu stacked.
+            Diff applier: hunks placed nearest their line hint; `gml_Script_` call prefixes that the
+            decompiler emits after a full replacement are normalized before matching.
       - [ ] CheatMenu: test inside a battle (freeze via instance_deactivate_all during bullet phase).
       - [ ] Per-script runtime swap (follow-up, per user): compile a single .gml and
             replace that `CCode`'s `VMBuffer` live, with no full-file recompile. First

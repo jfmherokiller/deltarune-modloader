@@ -76,7 +76,7 @@ point (decompiled with UTMT):
 | `<entry>.append.gml` | code added at the end |
 | `<entry>.prepend.gml` | code added at the start |
 | `<entry>.patch` | `>>> find` / `>>> replace` / `>>> end` blocks (see below) |
-| `*.diff` | `git diff` / unified diff output against decompiled GML (`+++ b/<entry>.gml`) |
+| `*.diff` | `git diff` / unified diff output against decompiled GML (`+++ b/<entry>.gml`). Each hunk is applied at the nearest match to its `@@ -N` line (like `git apply`), with indentation ignored for matching and kept from the diff |
 
 ```
 >>> find
@@ -113,6 +113,13 @@ Needs `mods\tools\utmt\` (UndertaleModTool CLI 0.9.2.0, `UTMT_CLI_*-Windows.zip`
 code-only version and is used if `ImportLooseMod.csx` is absent). You can override the CLI
 path with `utmt_cli=` in `modloader.ini` and the timeout with `gml_timeout_ms=` (default 300000).
 Ch2 with 216 GML files plus a few assets takes about 6 s.
+
+**Shrinking a loose-GML mod into patches:** `python tools/gml_to_patches.py <game> <src_mod> <out_mod>`
+decompiles vanilla for every `.gml` the mod replaces and writes a `.diff` wherever that's
+smaller (new or heavily rewritten entries stay as full `.gml`). For Local Multiplayer v19 this
+gives 25 MB → 4 MB, 1759 of 2812 entries as diffs, and a build identical to the full mod
+(all 2812 entries decompile the same). Because patches only touch the changed lines, other
+mods (e.g. CheatMenu's `obj_time_Step_1` append) stack on the same scripts.
 
 **Converting an xdelta mod:** `python tools/xdelta_to_gml.py <game> <ModName>
 chapter2_windows=patch.xdelta ...` keeps only the code entries the patch changed and

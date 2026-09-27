@@ -26,3 +26,6 @@ __pycache__/
 *.til
 data.win
 *.xdelta
+
+# third-party mods (not ours to redistribute)
+mods_examples/LocalMultiplayer*/

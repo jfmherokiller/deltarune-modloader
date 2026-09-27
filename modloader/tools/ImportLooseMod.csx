@@ -268,36 +268,43 @@ if (gml.Count > 0)
 int patchFail = 0, patchOk = 0;
 if (patchFiles.Count > 0)
 {
+    var dctx = new GlobalDecompileContext(Data);
+    var current = new Dictionary<string, string>(StringComparer.Ordinal);   // entry -> patched source so far
+    string Source(string entry, List<Edit> ops)
+    {
+        if (current.TryGetValue(entry, out var s)) return s;
+        var code = Data.Code.ByName(entry);
+        if (code is null)
+        {
+            if (!ops.All(o => o.Kind == "create" || o.Kind == "append" || o.Kind == "prepend"))
+                throw new Exception($"code entry {entry} does not exist");
+            return "";
+        }
+        if (code.ParentEntry is not null)
+            throw new Exception($"{entry} is a child entry; patch its parent {code.ParentEntry.Name.Content}");
+        string dec = new Underanalyzer.Decompiler.DecompileContext(dctx, code, Data.ToolInfo.DecompilerSettings).DecompileToString().Replace("\r\n", "\n");
+        // after a full replacement redefines a function, the decompiler prints calls to it as
+        // gml_Script_<name>(...); normalize back so patches written against vanilla still match
+        return Regex.Replace(dec, @"\bgml_Script_([A-Za-z_][A-Za-z0-9_]*)(?=\s*\()", "$1");
+    }
+    var fileEntries = new List<(string file, List<string> entries)>();
     foreach (string pf in patchFiles)
     {
-        string fn = Path.GetFileName(pf);
         string modTag = pf.Replace('\\', '/');
         try
         {
-            var edits = ParsePatchFile(pf);   // entry -> list of edits (in order)
+            var edits = ParsePatchFile(pf);
+            var staged = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var (entry, ops) in edits)
             {
-                var code = Data.Code.ByName(entry);
-                string src;
-                if (code is null)
-                {
-                    if (!ops.All(o => o.Kind == "create" || o.Kind == "append" || o.Kind == "prepend"))
-                        throw new Exception($"code entry {entry} does not exist");
-                    src = "";
-                }
-                else if (code.ParentEntry is not null)
-                    throw new Exception($"{entry} is a child entry; patch its parent {code.ParentEntry.Name.Content}");
-                else
-                    src = new Underanalyzer.Decompiler.DecompileContext(new GlobalDecompileContext(Data), code, Data.ToolInfo.DecompilerSettings).DecompileToString();
-                src = src.Replace("\r\n", "\n");
-                foreach (var op in ops) src = ApplyEdit(src, op, entry);
-                var g = new UndertaleModLib.Compiler.CodeImportGroup(Data) { AutoCreateAssets = true };
-                g.QueueReplace(entry, src);
-                var r = g.Import(false);
-                if (!r.Successful) throw new Exception("compile failed after patching:\n" + r.PrintAllErrors(true));
-                patchOk++;
+                string src = Source(entry, ops);
+                var hunks = ops.Where(o => o.Kind == "hunk").ToList();
+                foreach (var op in ops.Where(o => o.Kind != "hunk")) src = ApplyEdit(src, op, entry);
+                if (hunks.Count > 0) src = ApplyHunks(src, hunks, entry);
+                staged[entry] = src;
             }
-            Console.WriteLine($"[DR] patch OK  {modTag}");
+            foreach (var kv in staged) current[kv.Key] = kv.Value;   // a file applies all-or-nothing
+            fileEntries.Add((modTag, staged.Keys.ToList()));
         }
         catch (Exception ex)
         {
@@ -305,10 +312,31 @@ if (patchFiles.Count > 0)
             Console.WriteLine($"[DR] WARN patch FAILED {modTag}: {ex.Message}");
         }
     }
-    Console.WriteLine($"[DR] patches: {patchOk} entr(y/ies) patched, {patchFail} file(s) failed (skipped)");
+    // one compile pass for everything; on errors, retry entry by entry so one bad patch
+    // doesn't take the rest down
+    if (current.Count > 0)
+    {
+        var g = new UndertaleModLib.Compiler.CodeImportGroup(Data) { AutoCreateAssets = true };
+        foreach (var kv in current.OrderBy(k => k.Key, StringComparer.Ordinal)) g.QueueReplace(kv.Key, kv.Value);
+        var r = g.Import(false);
+        if (r.Successful) patchOk = current.Count;
+        else
+        {
+            Console.WriteLine("[DR] WARN batch patch compile failed, retrying one by one");
+            foreach (var kv in current.OrderBy(k => k.Key, StringComparer.Ordinal))
+            {
+                var g1 = new UndertaleModLib.Compiler.CodeImportGroup(Data) { AutoCreateAssets = true };
+                g1.QueueReplace(kv.Key, kv.Value);
+                var r1 = g1.Import(false);
+                if (r1.Successful) patchOk++;
+                else { patchFail++; Console.WriteLine($"[DR] WARN patched {kv.Key} does not compile (skipped):\n{r1.PrintAllErrors(true)}"); }
+            }
+        }
+    }
+    Console.WriteLine($"[DR] patches: {patchOk} entr(y/ies) patched from {fileEntries.Count} file(s), {patchFail} failure(s)");
 }
 
-record Edit(string Kind, string Find, string Replace, bool All = true);
+record Edit(string Kind, string Find, string Replace, bool All = true, int OldStart = 0);
 
 Dictionary<string, List<Edit>> ParsePatchFile(string path)
 {
@@ -350,11 +378,13 @@ Dictionary<string, List<Edit>> ParsePatchFile(string path)
     string target = Path.GetFileNameWithoutExtension(fn);
     bool fromNull = false;
     List<string> hf = null, hr = null;
+    int hstart = 0, pendingBlank = 0;
     void Flush()
     {
+        pendingBlank = 0;
         if (hf is null) return;
         if (fromNull) Add(target, new Edit("create", null, string.Join("\n", hr)));
-        else Add(target, new Edit("find", string.Join("\n", hf), string.Join("\n", hr), false));
+        else Add(target, new Edit("hunk", string.Join("\n", hf), string.Join("\n", hr), false, hstart));
         hf = hr = null;
     }
     foreach (string raw in lines)
@@ -368,9 +398,17 @@ Dictionary<string, List<Edit>> ParsePatchFile(string path)
             if (p != "/dev/null") target = Path.GetFileNameWithoutExtension(p.Replace('\\', '/').Split('/').Last());
             continue;
         }
-        if (raw.StartsWith("@@")) { Flush(); hf = new(); hr = new(); continue; }
+        if (raw.StartsWith("@@"))
+        {
+            Flush(); hf = new(); hr = new();
+            var hm = Regex.Match(raw, @"^@@ -(\d+)");
+            hstart = hm.Success ? int.Parse(hm.Groups[1].Value) : 0;
+            continue;
+        }
         if (hf is null || raw.StartsWith("\\")) continue;
-        if (raw.Length == 0) { hf.Add(""); hr.Add(""); continue; }
+        // bare empty lines: context only if more hunk lines follow (not the file's trailing newline)
+        if (raw.Length == 0) { pendingBlank++; continue; }
+        for (; pendingBlank > 0; pendingBlank--) { hf.Add(""); hr.Add(""); }
         char c = raw[0]; string body = raw.Substring(1);
         if (c == ' ') { hf.Add(body); hr.Add(body); }
         else if (c == '-') hf.Add(body);
@@ -410,6 +448,45 @@ string ApplyEdit(string src, Edit e, string entry)
     string rep = e.Replace;
     // keep the indentation of the matched first line for the replacement's unindented lines
     return e.All ? rx.Replace(src, m => Reindent(m.Value, rep)) : rx.Replace(src, m => Reindent(m.Value, rep), 1);
+}
+
+// Unified-diff hunks: line based, whitespace-insensitive matching, applied top to bottom.
+// Each hunk is searched nearest to its "@@ -N" hint (shifted by earlier hunks), like
+// `git apply`, so repeated code blocks bind to the right place. Replacement lines keep the
+// diff's own indentation.
+string ApplyHunks(string src, List<Edit> hunks, string entry)
+{
+    var lines = src.Split('\n').ToList();
+    int offset = 0, floor = 0;
+    foreach (var h in hunks.OrderBy(h => h.OldStart))
+    {
+        var find = h.Find.Length == 0 ? new List<string>() : h.Find.Split('\n').ToList();
+        var repl = h.Replace.Length == 0 ? new List<string>() : h.Replace.Split('\n').ToList();
+        int hint = Math.Max(0, h.OldStart - 1 + offset);
+        int at = -1;
+        if (find.Count == 0) at = Math.Min(hint, lines.Count);
+        else
+        {
+            var ft = find.Select(l => l.Trim()).ToList();
+            bool Match(int p) { for (int j = 0; j < ft.Count; j++) if (lines[p + j].Trim() != ft[j]) return false; return true; }
+            int max = lines.Count - ft.Count;
+            for (int d = 0; d <= Math.Max(hint, max - hint) && at < 0; d++)
+            {
+                if (hint + d <= max && hint + d >= floor && Match(hint + d)) at = hint + d;
+                else if (d > 0 && hint - d >= floor && hint - d <= max && Match(hint - d)) at = hint - d;
+            }
+        }
+        if (at < 0)
+        {
+            string first = find.Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0) ?? "";
+            throw new Exception($"{entry}: diff hunk @@ -{h.OldStart} not found (first line: \"{first}\")");
+        }
+        lines.RemoveRange(at, find.Count);
+        lines.InsertRange(at, repl);
+        offset += (at - hint) + repl.Count - find.Count;
+        floor = at + repl.Count;
+    }
+    return string.Join("\n", lines);
 }
 
 string Reindent(string matched, string rep)
