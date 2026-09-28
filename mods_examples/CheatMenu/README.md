@@ -3,6 +3,8 @@
 An in-game version of the Cheat Engine table. Press **F7** anywhere, in the overworld or in battle. The game
 freezes and a cheat overlay opens.
 
+<img src="../../docs/images/cheatmenu.png" alt="CheatMenu overlay" width="480">
+
 | Row | Keys |
 |---|---|
 | Gold | ←/→ ±10 (Shift ±1000) |
