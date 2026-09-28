@@ -5,6 +5,8 @@ Press **F9** in any chapter to label every sprite on screen with its name and fr
 Sprites placed directly on room layers (decorations) are labeled too.
 **Shift+F9** copies the list to the clipboard.
 
+<img src="../../docs/images/spriteinspector.png" alt="SpriteInspector overlay" width="640">
+
 Use the names with `mods\tools\export_sprites.bat` (see `modloader/README.md`, "Replacing a sprite").
 
 Built only from loose files: a new object `obj_drspriteinfo`, plus a 3-line

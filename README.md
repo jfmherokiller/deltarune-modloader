@@ -19,6 +19,15 @@ sprite and sound, plus two small patches, so it stacks with other mods.
 
 <img src="docs/images/cheatmenu.png" alt="CheatMenu overlay: Gold, Heal party, Fill TP, Lock HP, No damage, Infinite TP, per-character AT/DF/MAG/Max HP" width="480">
 
+## Example: SpriteInspector
+
+[`mods_examples/SpriteInspector`](mods_examples/SpriteInspector) is a tool for sprite modders. Press **F9** to
+label every sprite on screen with its name and frame, with a list of the room's sprites at the top left.
+**Shift+F9** copies the list. Get the original frames with `mods\tools\export_sprites.bat`, edit them,
+and drop them into your mod (see [Replacing a sprite](modloader/README.md#replacing-a-sprite-step-by-step)).
+
+<img src="docs/images/spriteinspector.png" alt="SpriteInspector: sprite names labeled over every object in room_dw_city_mice, with a sprite list panel" width="640">
+
 ## Install (players)
 
 1. Download the release zip and extract it into the DELTARUNE folder, next to `DELTARUNE.exe`.
