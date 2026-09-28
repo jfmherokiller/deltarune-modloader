@@ -1,0 +1,97 @@
+name: release
+
+# Every push to main builds the loader, YYToolkit (fork submodule) and the example plugin
+# from source, then publishes a GitHub release tagged v0.<run number>.<attempt>... see "version".
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - "docs/**"
+      - "RE/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          # latest vX.Y.Z tag -> bump patch; first run after v0.1.0 gives v0.1.1
+          last=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
+          [ -z "$last" ] && last=v0.1.0
+          IFS=. read -r maj min pat <<< "${last#v}"
+          ver="v$maj.$min.$((pat + 1))"
+          echo "tag=$ver" >> "$GITHUB_OUTPUT"
+          echo "last=$last" >> "$GITHUB_OUTPUT"
+          echo "version $ver (previous $last)"
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build loader (version.dll)
+        shell: cmd
+        run: call modloader\build.bat
+
+      - name: Build YYToolkit (fork submodule)
+        shell: cmd
+        run: msbuild external\YYToolkit\YYToolkit\YYToolkit.vcxproj -p:Configuration=Release -p:Platform=x64 -p:OutDir=%CD%\out\yytk\ -p:IntDir=%CD%\out\yytk\obj\ -v:minimal -nologo
+
+      - name: Build example plugin
+        shell: cmd
+        run: call modloader\yytk_plugin\build.bat
+
+      - name: Fetch Aurie v2.0.2 (unmodified release)
+        shell: bash
+        run: |
+          mkdir -p out/aurie
+          curl -sSfL -o out/aurie/AurieCore.dll https://github.com/AurieFramework/Aurie/releases/download/v2.0.2/AurieCore.dll
+          echo "18e3a1de980f487a6b3858b673d2030e96984dd96de3a047b43a263a5ba829ae  out/aurie/AurieCore.dll" | sha256sum -c -
+
+      - name: Package
+        shell: bash
+        env:
+          YYTK_DLL: out/yytk/YYToolkit.dll
+          AURIE_DLL: out/aurie/AurieCore.dll
+          PLUGIN_DLL: modloader/yytk_plugin/build/DeltaruneYYTK.dll
+        run: python tools/package_release.py "${{ steps.version.outputs.tag }}" "out/deltarune-modloader-${{ steps.version.outputs.tag }}.zip"
+
+      - name: Release notes
+        shell: bash
+        run: |
+          {
+            echo "Automatic build of \`${GITHUB_SHA::7}\`. Extract into the DELTARUNE folder, next to \`DELTARUNE.exe\`."
+            echo
+            echo "Loose \`.gml\`/sprite/sound mods also need UndertaleModTool CLI 0.9.2.0 in \`mods/tools/utmt/\`."
+            echo "Example mods are included disabled (\`mods/_CheatMenu\`, \`mods/_SpriteInspector\`); remove the \`_\` to enable."
+            echo
+            echo "YYToolkit is built from the [fork](https://github.com/jfmherokiller/YYToolkit/tree/fix/vm-room-data-non-inlined) (AGPL-3.0); AurieCore is the unmodified Aurie v2.0.2 release."
+            echo
+            echo "### Changes since ${{ steps.version.outputs.last }}"
+            git log --no-merges --format='- %s (%h)' "${{ steps.version.outputs.last }}..HEAD" 2>/dev/null || git log -20 --no-merges --format='- %s (%h)'
+          } > out/notes.md
+          cat out/notes.md
+
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.version.outputs.tag }}" \
+            "out/deltarune-modloader-${{ steps.version.outputs.tag }}.zip" \
+            --target "$GITHUB_SHA" \
+            --title "${{ steps.version.outputs.tag }}" \
+            --notes-file out/notes.md

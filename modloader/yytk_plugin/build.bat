@@ -3,9 +3,12 @@ rem Builds modloader\yytk_plugin\build\DeltaruneYYTK.dll (YYToolkit v5 plugin, M
 rem Headers in include\ come from YYToolkit's experimental branch (see include\YYTK_SOURCE_COMMIT.txt),
 rem which matches the YYToolkit.dll v5.0.0c release binary.
 setlocal
-set VCVARS=C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat
+set "VCVARS="
+if defined VSINSTALLDIR set "VCVARS=%VSINSTALLDIR%VC\Auxiliary\Build\vcvars64.bat"
+if not defined VCVARS for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VCVARS=%%i\VC\Auxiliary\Build\vcvars64.bat"
 if not exist "%VCVARS%" (
-  for /f "usebackq delims=" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -property installationPath`) do set VCVARS=%%i\VC\Auxiliary\Build\vcvars64.bat
+  echo Visual Studio with the C++ x64 tools not found
+  exit /b 1
 )
 call "%VCVARS%" >nul || exit /b 1
 cd /d "%~dp0"

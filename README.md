@@ -30,7 +30,7 @@ and drop them into your mod (see [Replacing a sprite](modloader/README.md#replac
 
 ## Install (players)
 
-1. Download the release zip and extract it into the DELTARUNE folder, next to `DELTARUNE.exe`.
+1. Download the [latest release](https://github.com/jfmherokiller/deltarune-modloader/releases/latest) zip and extract it into the DELTARUNE folder, next to `DELTARUNE.exe`.
 2. For loose-GML mods, also extract [UndertaleModTool CLI 0.9.2.0](https://github.com/UnderminersTeam/UndertaleModTool/releases/tag/0.9.2.0)
    (`UTMT_CLI_v0.9.2.0-Windows.zip`) into `mods\tools\utmt\`.
 3. Put each mod in `mods\<ModName>\`. See [`modloader/README.md`](modloader/README.md) for the layout.
@@ -43,6 +43,12 @@ To uninstall, delete `version.dll`.
 - **YYToolkit:** `git submodule update --init`, then
   `MSBuild external\YYToolkit\YYToolkit\YYToolkit.vcxproj -p:Configuration=Release -p:Platform=x64`.
 - **Example plugin:** `modloader\yytk_plugin\build.bat`.
+- **Release zip:** `python tools/package_release.py <version> <out.zip>` (see the script for inputs).
+
+Every push to `main` that changes code runs [`.github/workflows/release.yml`](.github/workflows/release.yml):
+it builds all three from source on `windows-2022`, downloads AurieCore v2.0.2 (hash-checked), and
+publishes a release with the next patch version (`v0.1.1`, `v0.1.2`, …). Pushes that only change
+docs (`*.md`, `docs/`, `RE/`) don't make a release. You can also start it by hand from the Actions tab.
 
 ## Not included
 
