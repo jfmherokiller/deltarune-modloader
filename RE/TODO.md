@@ -862,6 +862,13 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
       - Compiler: UTMT's (`UndertaleModLib.Compiler.CodeImportGroup`). Headless
         import script is `modloader/tools/ImportGMLFolder.csx`. Recompiling those 216
         decompiled files against vanilla Ch2 succeeds in about 6 s with 0 errors.
+- [x] Sprite modding helpers (2026-09-27): SpriteInspector example mod (F9 labels, Shift+F9 copies
+      names), `export_sprites.bat` + `ExportSprites.csx` (vanilla frames into a mod, wildcards,
+      matches UTMT export pixel for pixel), import-time sprite checks in `ImportLooseMod.csx`
+      (typo suggestion, frame gaps, extra frames, size mismatch, misnamed folder). Verified in Ch2.
+- [ ] Sprite follow-ups: define resize/origin behavior for size-changed frames (keep anchor?);
+      strip / GIF input (`spr_x_strip4.png`); `sprite.json` (origin, speed, bbox) replacing
+      `.origin.txt`; cache the in-memory build when mods\ is unchanged (~5 s per launch today).
 - [ ] **radare2 / rizin — second opinion + scripting practice.**
   - `r2 -A DELTARUNE.exe`; `afl~gml_`, `axt @ sym.Function_Add`, `pdf`, play with ESIL.
   - Script a standalone xref-count ranking to seed Track A/P1 without IDA.

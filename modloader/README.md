@@ -74,6 +74,34 @@ mods\<Mod>\code\... sprites\... sounds\...                            launcher (
 `mods\<Mod>\all_chapters\` has the same layout and is applied to every `chapterN_windows`
 data.win (before that chapter's own folder).
 
+### Replacing a sprite (step by step)
+
+1. **Find its name.** Install `mods_examples/SpriteInspector` (copy it into `mods\`) and press
+   **F9** in game. Every sprite on screen gets a yellow label (`spr_city_mice_bell [0/2]`
+   = frame 0 of 2), and a panel lists the room and the unique names. **Shift+F9** copies
+   that list to the clipboard. Disable the mod again (`_SpriteInspector`) when you're done.
+2. **Get the original frames** into your mod, already named correctly:
+   ```
+   mods\tools\export_sprites.bat 2 MyMod spr_city_mice_bell
+   mods\tools\export_sprites.bat 1 MyMod spr_krisd*          (wildcards work)
+   ```
+   This writes `mods\MyMod\chapter2_windows\sprites\spr_city_mice_bell\spr_city_mice_bell_0.png`,
+   `_1.png`, and so on. It never overwrites files, and it suggests close names if one
+   doesn't exist. Subfolders under `sprites\` are optional; flat files work the same.
+3. **Edit the PNGs.** Keep the file names and, ideally, the size.
+4. **Start the game** and read `mods\modloader.gml.log`:
+   ```
+   [DR] sprite spr_city_mice_bell: replacing frame(s) _0.._1 of 2 (MyMod)
+   ```
+   Mistakes are reported there instead of silently doing nothing:
+   - a misspelled name, which would create an unused new sprite: *"did you mean …?"*;
+   - frames past the original count with a gap (the sprite is skipped), or without one (a
+     warning, because the game's code may never show extra frames);
+   - a frame whose size differs from the original, which may look shifted;
+   - PNGs in a wrongly named folder (e.g. `Sprite\` from a UTMT export).
+   New sprites (a name the game doesn't have) need frames `_0`, `_1`, … with no gaps. Add
+   `<name>.origin.txt` to set their origin, which also marks the new name as intentional.
+
 ### Patching instead of replacing
 
 Full `.gml` files replace a script entirely (a later mod wins). To change *part* of a script, so that

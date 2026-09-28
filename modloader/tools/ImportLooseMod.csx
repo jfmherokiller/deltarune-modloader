@@ -83,6 +83,122 @@ foreach (string root in roots)
 }
 Console.WriteLine($"[DR] {roots.Count} mod root(s): {spriteFrames.Count} sprite(s), {sounds.Count} sound(s), {gml.Count} GML file(s), {patchFiles.Count} patch file(s)");
 
+// ---------------------------------------------------------------- sprite checks (before anything is changed)
+foreach (string root in roots)
+    foreach (string d in Directory.GetDirectories(root))
+    {
+        string dn = Path.GetFileName(d);
+        if (dn.Equals("sprites", StringComparison.OrdinalIgnoreCase) || dn.Equals("code", StringComparison.OrdinalIgnoreCase)
+            || dn.Equals("sounds", StringComparison.OrdinalIgnoreCase)) continue;
+        if (Directory.EnumerateFiles(d, "*.png", SearchOption.AllDirectories).Any())
+            Console.WriteLine($"[DR] WARN {d} is ignored; sprite PNGs go in {Path.Combine(root, "sprites")}");
+    }
+foreach (string name in spriteFrames.Keys.ToList())
+{
+    var frames = spriteFrames[name];
+    string from = ModOf(frames.Values.First());
+    var van = Data.Sprites.ByName(name);
+    if (van is null)
+    {
+        var near = NearestSprite(name);
+        if (near != null && !spriteOrigins.ContainsKey(name))
+            Console.WriteLine($"[DR] WARN {name} ({from}) is not a sprite in this chapter - did you mean {near}? " +
+                              $"It will be added as a NEW sprite that nothing draws. If that's intended, add {name}.origin.txt to silence this.");
+        int expect = 0;
+        foreach (int f in frames.Keys)
+        {
+            if (f != expect)
+            {
+                Console.WriteLine($"[DR] ERROR new sprite {name} ({from}): frame {expect} is missing (frames must be _0, _1, _2 ... without gaps); sprite skipped");
+                spriteFrames.Remove(name);
+                break;
+            }
+            expect++;
+        }
+        continue;
+    }
+    int vanCount = van.Textures.Count;
+    var extra = frames.Keys.Where(f => f >= vanCount).ToList();
+    if (extra.Count > 0)
+    {
+        int hole = Enumerable.Range(vanCount, extra.Max() - vanCount + 1).FirstOrDefault(f => !frames.ContainsKey(f), -1);
+        if (hole >= 0)
+        {
+            Console.WriteLine($"[DR] ERROR {name} ({from}): has {vanCount} frame(s) (_0.._{vanCount - 1}); added frames must continue from _{vanCount}, but _{hole} is missing; sprite skipped");
+            spriteFrames.Remove(name);
+            continue;
+        }
+        Console.WriteLine($"[DR] WARN {name} ({from}): adds frame(s) _{extra.Min()}.._{extra.Max()} beyond the original {vanCount}; the game's code may never show them");
+    }
+    foreach (var (f, path) in frames)
+    {
+        var (w, h) = PngSize(path);
+        if (w != van.Width || h != van.Height)
+            Console.WriteLine($"[DR] WARN {name}_{f} ({from}) is {w}x{h} but the original is {van.Width}x{van.Height}; " +
+                              $"it is drawn from origin {van.OriginX},{van.OriginY} (top-left based), so it may look shifted");
+    }
+    var replaced = frames.Keys.Where(f => f < vanCount).ToList();
+    if (replaced.Count > 0)
+        Console.WriteLine($"[DR] sprite {name}: replacing frame(s) {Ranges(replaced)} of {vanCount} ({from})" +
+                          (replaced.Count < vanCount ? $"; frames {Ranges(Enumerable.Range(0, vanCount).Except(replaced).ToList())} stay original" : ""));
+}
+
+string ModOf(string path)
+{
+    // mods\<Mod>\<chapter|all_chapters>\sprites\... -> <Mod>
+    var parts = Path.GetFullPath(path).Split(Path.DirectorySeparatorChar);
+    int i = Array.FindLastIndex(parts, p => p.Equals("sprites", StringComparison.OrdinalIgnoreCase));
+    return i >= 2 ? parts[i - 2] : path;
+}
+string NearestSprite(string name)
+{
+    string best = null; int bd = int.MaxValue;
+    string lo = name.ToLowerInvariant();
+    foreach (var s in Data.Sprites)
+    {
+        if (s?.Name is null) continue;
+        int d = Lev(lo, s.Name.Content.ToLowerInvariant(), bd);
+        if (d < bd) { bd = d; best = s.Name.Content; }
+    }
+    return bd <= Math.Max(2, name.Length / 5) ? best : null;
+}
+static int Lev(string a, string b, int cap)
+{
+    if (Math.Abs(a.Length - b.Length) >= cap) return cap;
+    var prev = new int[b.Length + 1]; var cur = new int[b.Length + 1];
+    for (int j = 0; j <= b.Length; j++) prev[j] = j;
+    for (int i = 1; i <= a.Length; i++)
+    {
+        cur[0] = i; int rowMin = cur[0];
+        for (int j = 1; j <= b.Length; j++)
+        {
+            cur[j] = Math.Min(Math.Min(prev[j] + 1, cur[j - 1] + 1), prev[j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1));
+            rowMin = Math.Min(rowMin, cur[j]);
+        }
+        if (rowMin >= cap) return cap;
+        (prev, cur) = (cur, prev);
+    }
+    return prev[b.Length];
+}
+static (uint, uint) PngSize(string path)
+{
+    using var fs = File.OpenRead(path);
+    var hdr = new byte[24];
+    if (fs.Read(hdr, 0, 24) == 24 && hdr[1] == 'P' && hdr[2] == 'N' && hdr[3] == 'G')
+        return ((uint)(hdr[16] << 24 | hdr[17] << 16 | hdr[18] << 8 | hdr[19]), (uint)(hdr[20] << 24 | hdr[21] << 16 | hdr[22] << 8 | hdr[23]));
+    return (0, 0);
+}
+static string Ranges(List<int> xs)
+{
+    var s = new List<string>(); xs.Sort();
+    for (int i = 0; i < xs.Count; )
+    {
+        int j = i; while (j + 1 < xs.Count && xs[j + 1] == xs[j] + 1) j++;
+        s.Add(i == j ? $"_{xs[i]}" : $"_{xs[i]}.._{xs[j]}"); i = j + 1;
+    }
+    return string.Join(", ", s);
+}
+
 // ---------------------------------------------------------------- sprites
 if (spriteFrames.Count > 0)
     ImportSprites();
@@ -196,7 +312,7 @@ void ImportSprites()
         {
             var spr = Data.Sprites.ByName(name);
             int holes = spr.Textures.Count(t => t is null);
-            if (holes > 0) throw new ScriptException($"sprite {name} has {holes} missing frame(s); new frames must be numbered from 0 without gaps");
+            if (holes > 0) Console.WriteLine($"[DR] ERROR sprite {name} still has {holes} empty frame(s)");
         }
         Console.WriteLine($"[DR] sprites OK ({images.Count} frame(s) on {pages.Count} new texture page(s))");
     }
