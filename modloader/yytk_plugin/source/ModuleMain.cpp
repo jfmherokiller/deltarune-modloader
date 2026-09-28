@@ -4,8 +4,8 @@
 //   * counts GML event executions (EVENT_OBJECT_CALL = YYTK's ExecuteIt hook)
 //   * about once a second (every 30th obj_gamecontroller Begin Step), prints the
 //     current room and DELTARUNE globals read through the YYTK interface.
-//     (EVENT_FRAME is not used: YYToolkit 5.0.0 never installs its Stage 3
-//     D3D11 Present hook, so frame callbacks never fire.)
+//     (Upstream YYToolkit 5.0.0 never fires EVENT_FRAME; the fork submodule does,
+//     see AurieFramework/YYToolkit#83. This plugin still ticks from a step event.)
 // Output goes to the Aurie console and aurie.log in the game folder.
 #include <YYToolkit/YYTK_Shared.hpp>
 #include <atomic>
@@ -39,9 +39,7 @@ static void CodeCallback(FWCodeEvent& Ctx)
 }
 
 // Reads global.<Name> via the GML builtins (variable_global_exists/_get).
-// YYTK 5.0.0's GetInstanceMember(global, ...) crashes on this runner: it passes the
-// global CInstance through variable_instance_exists and the runner's YYGetString
-// faults (see modloader/README.md).
+// (GetInstanceMember works too; built-ins like x/y need GetBuiltin, see YYToolkit#86.)
 static bool ReadGlobal(const char* Name, RValue& Out)
 {
 	if (!g_Yytk->CallBuiltin("variable_global_exists", { Name }).ToBoolean())

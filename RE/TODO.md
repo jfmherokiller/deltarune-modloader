@@ -798,6 +798,19 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
       hook call). The example plugin `modloader/yytk_plugin` logs room, chapter and gold
       live.
       - [x] Upstream the Room_Data fix: https://github.com/AurieFramework/YYToolkit/pull/85
+      - [x] (2026-09-28) Correction to (3): the crash is `GetInstanceMember(<inst>, <built-in>)`
+            (x, y, ...): built-ins have no var-map slot, and the FindAllocSlot/InternalGetYYVarRef
+            fallback faulted. Globals and user vars work. Fixed -> `AURIE_ACCESS_DENIED`
+            (PR https://github.com/AurieFramework/YYToolkit/pull/86); read built-ins via GetBuiltin.
+      - [x] (2026-09-28) EVENT_FRAME: applied open upstream PR #83 (calls InitializeStage3Hooks).
+            Frames fire on DELTARUNE (Stage3 => AURIE_SUCCESS, 601 frames in ~10 s).
+      - [x] Fork branch `deltarune` = experimental + #85 + #83 + #86; submodule now tracks it.
+      - [x] `modloader/yytk_probe` (YYTKProbe.dll): game-independent API self-test under SEH,
+            18/18 on DELTARUNE Ch2. Run it on any GameMaker game before building editor features.
+      - [ ] Runtime editor groundwork (generic, any GameMaker game): validate YYTKProbe on a 2nd
+            game (YYC and VM); add probes for SetBuiltin, instance create/destroy, room_goto,
+            sprite_replace; decide the editor UI process (separate native window talking to an
+            in-game YYTK plugin over a pipe, not an in-game ImGui overlay).
       - [ ] Re-test the whole stack under Wine (Aurie's MmCreateHook hung there before).
       - [ ] Port the old `mod_test/aurie_build` plugin ideas to the v5 headers.
 - [x] **Cleanup** (2026-09-27): deleted the whole `mod_test/` Wine rig (800 MB: proxy

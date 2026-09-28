@@ -29,3 +29,4 @@ data.win
 
 # third-party mods (not ours to redistribute)
 mods_examples/LocalMultiplayer*/
+modloader/yytk_probe/build/

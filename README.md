@@ -7,8 +7,9 @@ Tools for modding the Steam release of **DELTARUNE** (GameMaker VM runner, x64, 
 | [`mods_examples/`](mods_examples/) | Example mods: `CheatMenu` (F7 in-game cheat overlay; new object/sprite/sound + patch files), `SpriteInspector` (F9 labels every sprite on screen with its name) |
 | [`modloader/`](modloader/README.md) | `version.dll` proxy mod loader. It handles loose-file overrides, **loose `.gml` script replacement** (no xdelta, and `data.win` is never modified), script redirects, and loads Aurie + YYToolkit (patched for DELTARUNE). |
 | [`modloader/yytk_plugin/`](modloader/yytk_plugin) | Example YYToolkit v5 plugin that reads the room and globals live. |
+| [`modloader/yytk_probe/`](modloader/yytk_probe) | `YYTKProbe.dll`: game-independent self-test of the YYToolkit APIs an editor needs (PASS/FAIL to `yytk_probe.log`). |
 | [`modloader/tools/`](modloader/tools) | `ImportLooseMod.csx` (loose GML/patch/sprite/sound import), `export_sprites.bat` (copy original sprite frames into a mod), `xdelta_to_gml.py` (xdelta mod → loose GML) and `gml_to_patches.py` (full `.gml` → `.diff` patches). |
-| [`external/YYToolkit`](https://github.com/jfmherokiller/YYToolkit/tree/fix/vm-room-data-non-inlined) | Submodule: our YYToolkit fork, which contains the fix submitted upstream as [AurieFramework/YYToolkit#85](https://github.com/AurieFramework/YYToolkit/pull/85). |
+| [`external/YYToolkit`](https://github.com/jfmherokiller/YYToolkit/tree/fix/vm-room-data-non-inlined) | Submodule: our YYToolkit fork (branch `deltarune`) = upstream `experimental` plus [#85](https://github.com/AurieFramework/YYToolkit/pull/85) (Room_Data on VM runners), [#83](https://github.com/AurieFramework/YYToolkit/pull/83) (EVENT_FRAME never fired) and [#86](https://github.com/AurieFramework/YYToolkit/pull/86) (GetInstanceMember crash on built-ins). |
 | [`RE/`](RE/00_README.md) | Reverse-engineering notes for `DELTARUNE.exe` (VM, `data.win` loader, instances, globals) and the Cheat Engine / PINCE stat trainers. |
 
 ## Example: CheatMenu
