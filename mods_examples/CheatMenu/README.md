@@ -12,7 +12,28 @@ freezes and a cheat overlay opens.
 | Lock HP / No damage / Infinite TP | Z or ←/→ toggles; stays active after closing |
 | Character | ←/→ picks the party member for the stat rows |
 | AT / DF / MAG / Max HP | ←/→ ±1 (Max HP ±10; Shift ×10) |
+| Inventory... | Z opens the inventory editor (below) |
 | Close | Z, X or F7 |
+
+### Inventory editor
+
+<img src="../../docs/images/cheatmenu_inventory.png" alt="CheatMenu inventory editor" width="480">
+
+Edits the Dark World inventory: **Items** (12 slots), **Weapons** and **Armor** (48 slots; 12 in
+Chapter 1), and **Key Items** (12).
+
+| Keys | Effect |
+|---|---|
+| ←/→ on the top row | switch category |
+| ↑/↓ | pick a slot (the list scrolls) |
+| ←/→ on a slot | cycle through every item the chapter has (Shift ×5) |
+| Del / Backspace / C | empty the slot |
+| X | back to the cheat page |
+
+Item names come from the game's own `scr_iteminfo` / `scr_weaponinfo` / `scr_armorinfo` /
+`scr_keyiteminfo`, so the list matches each chapter (and other mods' added items) automatically.
+The game's menus stop at the first empty slot, so gaps are closed when you leave the page.
+Equipped gear (`global.charweapon` / `chararmor`) and the Light World inventory aren't edited.
 
 Install: copy `CheatMenu\` into `DELTARUNE\mods\`. It needs the loader plus `mods\tools\` (the UTMT CLI and
 `ImportLooseMod.csx`).

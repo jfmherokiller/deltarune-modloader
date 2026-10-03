@@ -18,6 +18,13 @@ if (!global.drcheat_open)
 }
 
 // ---- open / close
+if (global.drcheat_open && global.drcheat_page == 1 && keyboard_check_pressed(ord("X")))
+{
+    drc_inv_compact();
+    global.drcheat_page = 0;
+    snd_play(snd_smallswing);
+    exit;
+}
 if (keyboard_check_pressed(vk_f7) || (global.drcheat_open && keyboard_check_pressed(ord("X"))))
 {
     if (!global.drcheat_open)
@@ -72,6 +79,58 @@ else
 }
 var big = keyboard_check(vk_shift);
 var ok = keyboard_check_pressed(ord("Z")) || keyboard_check_pressed(vk_enter);
+
+
+// ---- inventory page
+if (global.drcheat_page == 1)
+{
+    if (!drc_inv_ready)
+        drc_inv_build();
+    var cat = clamp(global.drcheat_invcat, 0, 3);
+    var ns = drc_inv_slots(cat);
+    var r = clamp(global.drcheat_invsel, -1, ns - 1);
+    if (keyboard_check_pressed(vk_up))
+    {
+        r = (r <= -1) ? (ns - 1) : (r - 1);
+        snd_play(snd_menumove);
+    }
+    if (keyboard_check_pressed(vk_down))
+    {
+        r = (r >= ns - 1) ? -1 : (r + 1);
+        snd_play(snd_menumove);
+    }
+    if (r == -1 && step != 0)
+    {
+        cat = (cat + 4 + step) mod 4;
+        snd_play(snd_menumove);
+    }
+    else if (r >= 0 && step != 0)
+    {
+        // cycle through the ids the game has names for (0 = empty)
+        var ids = drc_inv_ids[cat];
+        var cnt = array_length(ids);
+        var cur = drc_inv_get(cat, r);
+        var pos = 0;
+        for (var k = 0; k < cnt; k++)
+        {
+            if (ids[k] == cur) { pos = k; break; }
+        }
+        pos = (pos + cnt + step * (big ? 5 : 1)) mod cnt;
+        if (pos < 0) pos += cnt;
+        drc_inv_set(cat, r, ids[pos]);
+        snd_play(snd_menumove);
+    }
+    if (r >= 0 && (keyboard_check_pressed(vk_delete) || keyboard_check_pressed(vk_backspace) || keyboard_check_pressed(ord("C"))))
+    {
+        drc_inv_set(cat, r, 0);
+        snd_play(snd_smallswing);
+    }
+    global.drcheat_invcat = cat;
+    global.drcheat_invsel = r;
+    if (drc_msgtime > 0)
+        drc_msgtime--;
+    exit;
+}
 
 // selected party member (skip empty slots)
 var slot = clamp(global.drcheat_slot, 0, 2);
@@ -137,6 +196,13 @@ switch (global.drcheat_sel)
         }
         break;
     case 11:
+        if (ok)
+        {
+            global.drcheat_page = 1;
+            snd_play(snd_select);
+        }
+        break;
+    case 12:
         if (ok)
         {
             drc_close();

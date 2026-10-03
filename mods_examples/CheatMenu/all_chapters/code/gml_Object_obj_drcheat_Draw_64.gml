@@ -16,7 +16,7 @@ draw_set_alpha(1);
 
 // box
 var bw = 420;
-var bh = 410;
+var bh = 440;
 var bx = cx + (cw - bw) / 2;
 var by = cy + (chh - bh) / 2;
 draw_set_color(c_black);
@@ -27,6 +27,45 @@ for (var t = 0; t < 3; t++)
 
 scr_84_set_draw_font("main");
 draw_sprite(spr_drcheat_icon, 0, bx + 28, by + 26);
+
+if (global.drcheat_page == 1)
+{
+    draw_text(bx + 50, by + 12, "INVENTORY");
+    var cat = clamp(global.drcheat_invcat, 0, 3);
+    var ns = drc_inv_slots(cat);
+    var r = global.drcheat_invsel;
+    var rx = bx + 50;
+    var ry = by + 48;
+    var rh = 26;
+    draw_set_color((r == -1) ? c_yellow : c_white);
+    draw_text(rx, ry, "< " + drc_inv_cats[cat] + " >");
+    if (r == -1)
+        draw_sprite(spr_heart, 0, rx - 26, ry + 8);
+    var vis = 12;
+    var top = clamp(r - 5, 0, max(0, ns - vis));
+    for (var i = 0; i < vis && top + i < ns; i++)
+    {
+        var si = top + i;
+        var y0 = ry + 34 + i * rh;
+        var idv = drc_inv_ready ? drc_inv_get(cat, si) : 0;
+        draw_set_color((si == r) ? c_yellow : ((idv == 0) ? c_gray : c_white));
+        draw_text(rx, y0, string(si + 1));
+        draw_text(rx + 40, y0, drc_inv_ready ? drc_inv_name(cat, idv) : "...");
+        if (si == r)
+            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
+    }
+    draw_set_color(c_gray);
+    if (top > 0)
+        draw_text(bx + bw - 40, ry + 34, "^");
+    if (top + vis < ns)
+        draw_text(bx + bw - 40, ry + 34 + (vis - 1) * rh, "v");
+    if (variable_global_exists("darkzone") && !global.darkzone)
+        draw_text(bx + 20, by + bh - 60, "(Light World items aren't listed)");
+    draw_text(bx + 20, by + bh - 34, "</> item  SHIFT x5  DEL clear  X back");
+    draw_set_color(c_white);
+    exit;
+}
+
 draw_text(bx + 50, by + 12, "CHEATS");
 
 var slot = clamp(global.drcheat_slot, 0, 2);
@@ -59,6 +98,7 @@ for (var i = 0; i < array_length(drc_rows); i++)
         case 8: v = (ch > 0) ? ("< " + string(global.df[ch]) + " >") : "-"; break;
         case 9: v = (ch > 0) ? ("< " + string(global.mag[ch]) + " >") : "-"; break;
         case 10: v = (ch > 0) ? ("< " + string(global.maxhp[ch]) + " >  HP " + string(global.hp[ch])) : "-"; break;
+        case 11: v = ">"; break;
     }
     draw_text(vx, y0, v);
     if (sel)
