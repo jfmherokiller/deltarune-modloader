@@ -27,10 +27,28 @@ Open F7 during a battle, then **Enemies...**:
 | All: HP 1 | every enemy to 1 HP |
 | per enemy: HP / Mercy / Tired | ←/→ ±10 (Shift ±100); Z toggles Tired |
 
-Scripted story and boss fights (Chapter 2's Queen, Spamton NEO, Jevil, King...) are started
-with `global.specialbattle` set, and forcing their spare state crashes or breaks their scripted
-endings (seen sparing Queen). In those fights the mercy rows are hidden, auto mercy pauses and
-"All: can spare" refuses. HP editing still works there.
+Some enemies can't be spared in the real game, and forcing their spare state crashes or breaks
+the scripted fight (seen sparing Chapter 2's Queen). For those, the editor hides Mercy/Tired,
+auto mercy skips them, "All: can spare" leaves them alone, and the enemy is labelled
+*(can't be spared)*. HP editing still works.
+
+The list is generated per chapter from the game's own code by `tools/gen_nospare.csx`
+(`chapterN_windows/code/gml_GlobalScript_scr_drcheat_nospare.gml`). An enemy is listed when:
+
+- its SPARE event is a no-op (unless a battle-controller mercy ending replaces it, as for Spamton NEO),
+- its step event forces its mercy back to 0 outside any ACT, or
+- it has no spare points and none of its code ever raises its mercy.
+
+| Chapter | Can't be spared |
+|---|---|
+| 1 | Lancer (2nd and 3rd fights), Dummy |
+| 2 | Queen, GIGA Queen, Sweet / Cap'n / K_K, Berdly (1st fight), Pipis, Jigsaw Joe, Dummy |
+| 3 | Tenna (both), Elnina, Lanino (1st fights), Knight, Jigsaw Joe, Dummy |
+| 4 | Hammer of Justice, the ??? fight, Titan, Titan Spawn, Jackenstein, Swatchling, Jigsaw Joe, Dummy |
+| 5 | Blue, Yellow, Jigsaw Joe |
+
+Re-run it after a game update:
+`DR_OUT_DIR=mods\CheatMenu\chapterN_windows\code UndertaleModCli load chapterN_windows\data.win -s tools\gen_nospare.csx`
 
 ### Inventory editor
 

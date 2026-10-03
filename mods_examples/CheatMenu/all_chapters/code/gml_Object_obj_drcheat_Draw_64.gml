@@ -86,21 +86,21 @@ if (global.drcheat_page == 2)
             // enemy header line before its HP row
             yy += 6;
             draw_set_color(c_aqua);
-            draw_text(rx - 10, yy, drc_en_name(e));
+            draw_text(rx - 10, yy, drc_en_name(e) + (drc_en_nospare(e) ? "  (can't be spared)" : ""));
             yy += rh;
         }
         var lab = "";
         var v = "";
         switch (kind)
         {
-            case 0: lab = "Auto mercy"; v = (fight && drc_special_battle()) ? "(paused)" : (global.drcheat_automercy ? "ON" : "OFF"); break;
+            case 0: lab = "Auto mercy"; v = global.drcheat_automercy ? "ON" : "OFF"; break;
             case 1: lab = "All: can spare"; break;
             case 2: lab = "All: HP 1"; break;
             case 10: lab = "HP"; v = "< " + string(global.monsterhp[e]) + " > / " + string(global.monstermaxhp[e]); break;
             case 11: lab = "Mercy"; v = "< " + string(global.mercymod[e]) + "% >"; break;
             case 12: lab = "Tired"; v = (global.monsterstatus[e] == 1) ? "YES" : "NO"; break;
         }
-        var off = ((kind == 1 || kind == 2) && !fight) || ((kind == 0 || kind == 1) && fight && drc_special_battle());
+        var off = (kind == 1 || kind == 2) && !fight;
         draw_set_color((i == r) ? c_yellow : (off ? c_gray : c_white));
         draw_text(rx + ((kind >= 10) ? 16 : 0), yy, lab);
         draw_text(vx, yy, v);
@@ -111,8 +111,6 @@ if (global.drcheat_page == 2)
     draw_set_color(c_gray);
     if (!fight)
         draw_text(rx, yy + 10, "(not in a battle)");
-    else if (drc_special_battle())
-        draw_text(rx, yy + 10, "(boss battle: mercy cheats off)");
     draw_set_color(c_gray);
     draw_text(bx + 20, by + bh - 34, "Z/</> change  SHIFT x10  X back");
     if (drc_msgtime > 0)

@@ -15,11 +15,11 @@ if (!global.drcheat_open)
         global.inv = 30;
     if (global.drcheat_inftp && _hastp && global.tension < global.maxtension)
         global.tension = global.maxtension;
-    if (global.drcheat_automercy && drc_in_battle() && !drc_special_battle())
+    if (global.drcheat_automercy && drc_in_battle())
     {
         for (var i = 0; i < 3; i++)
         {
-            if (drc_en_alive(i) && global.mercymod[i] < drc_en_mercymax(i))
+            if (drc_en_alive(i) && !drc_en_nospare(i) && global.mercymod[i] < drc_en_mercymax(i))
                 drc_en_spareable(i);
         }
     }
@@ -160,15 +160,20 @@ if (global.drcheat_page == 2)
             if (ok || step != 0) { global.drcheat_automercy = !global.drcheat_automercy; snd_play(snd_select); }
             break;
         case 1:
-            if (ok && fight && drc_special_battle())
+            if (ok && fight)
             {
-                drc_msg = "Not in boss battles"; drc_msgtime = 60; snd_play(snd_smallswing);
-            }
-            else if (ok && fight)
-            {
+                var done = 0;
+                var skipped = 0;
                 for (var i = 0; i < 3; i++)
-                    if (drc_en_alive(i)) drc_en_spareable(i);
-                drc_msg = "All can be spared"; drc_msgtime = 60; snd_play(snd_select);
+                {
+                    if (!drc_en_alive(i)) continue;
+                    if (drc_en_nospare(i)) { skipped++; continue; }
+                    drc_en_spareable(i);
+                    done++;
+                }
+                if (done == 0 && skipped > 0) { drc_msg = "Can't be spared"; snd_play(snd_smallswing); }
+                else { drc_msg = (skipped > 0) ? "Spareable (some can't be)" : "All can be spared"; snd_play(snd_select); }
+                drc_msgtime = 60;
             }
             break;
         case 2:
