@@ -122,10 +122,12 @@ static bool T_InstObject(void*, std::string* d)
 	*d = b;
 	return AurieSuccess(s) && g_InstPtr;
 }
+static std::string g_FirstMember;
 static bool T_InstEnum(void*, std::string* d)
 {
 	int n = 0; std::string names;
 	AurieStatus s = g_Yytk->EnumInstanceMembers(RValue(g_InstPtr), [&](const char* nm, RValue*) {
+		if (!n && nm) g_FirstMember = nm;
 		if (n < 6) { names += nm; names += ","; } n++; return false; });
 	*d = std::string(AurieStatusToString(s)) + " members=" + std::to_string(n) + " [" + names + "]";
 	return n >= 0;
@@ -175,6 +177,20 @@ static bool T_InstVarGetBuiltin(void* ctx, std::string* d)
 	*d = std::string("variable_instance_get(") + name + ") kind=" + std::to_string((int)v.m_Kind) + " value=" + v.ToString();
 	return true;
 }
+static bool T_RoomListDiag(void*, std::string* d)
+{
+	CRoom* r = nullptr;
+	if (!AurieSuccess(g_Yytk->GetCurrentRoomData(r)) || !r) { *d = "no room"; return false; }
+	CRoomInternal& m = r->GetMembers();
+	RValue cnt; g_Yytk->GetBuiltin("instance_count", nullptr, NULL_INDEX, cnt);
+	int n = 0;
+	for (CInstance* i = m.m_ActiveInstances.m_First; i && n < 100000; i = i->GetMembers().m_Flink) n++;
+	char b[256];
+	snprintf(b, sizeof(b), "internals at room+0x%llx: list count=%d walked=%d instance_count=%d",
+		(unsigned long long)((char*)&m - (char*)r), m.m_ActiveInstances.m_Count, n, cnt.ToInt32());
+	*d = b;
+	return n == cnt.ToInt32() && n == m.m_ActiveInstances.m_Count;
+}
 static bool T_CurrentRoom(void*, std::string* d)
 {
 	CRoom* r = nullptr;
@@ -192,6 +208,7 @@ static void RunAll()
 	Run("EVENT_FRAME fires", T_FrameEvent);
 	Run("GetGlobalInstance", T_GlobalInstance);
 	Run("GetCurrentRoomData + room builtin", T_CurrentRoom);
+	Run("current room active-instance list", T_RoomListDiag);
 	Run("builtin variable_instance_get_names(global)", T_GlobalNamesBuiltin);
 	Run("builtin variable_instance_exists(global, name)", T_GlobalExistsBuiltin);
 	Run("EnumInstanceMembers(global)", T_EnumGlobal);
@@ -205,10 +222,10 @@ static void RunAll()
 	Run("GetInstanceObject", T_InstObject);
 	if (g_InstPtr)
 	{
-		static const char* kX = "x"; static const char* kUser = "drc_msgtime";
+		static const char* kX = "x";
 		Run("EnumInstanceMembers(instance)", T_InstEnum);
 		Run("builtin variable_instance_get(inst, x)", T_InstVarGetBuiltin, (void*)kX);
-		Run("GetInstanceMember(inst, user var)", T_InstMemberX, (void*)kUser);
+		if (!g_FirstMember.empty()) Run("GetInstanceMember(inst, first enumerated var)", T_InstMemberX, (void*)g_FirstMember.c_str());
 		Run("GetBuiltin(x, inst)", T_InstBuiltinX, (void*)kX);
 		Run("GetInstanceMember(inst, x) refuses builtins", T_BuiltinXDenied);
 	}

@@ -12,7 +12,7 @@ call "%VCVARS%" >nul || exit /b 1
 cd /d "%~dp0"
 set YY=..\..\external\YYToolkit\YYToolkit
 if not exist build mkdir build
-cl /nologo /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=0 /Fobuild\ /Fdbuild\ ^
+cl /nologo /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=1 /Fobuild\ /Fdbuild\ ^
    /I %YY%\include /I %YY%\source\YYTK\Shared /I stub ^
    source\ModuleMain.cpp %YY%\source\YYTK\Shared\YYTK_Shared_Types.cpp ^
    /link /OUT:build\YYTKProbe.dll /IMPLIB:build\YYTKProbe.lib /PDB:build\YYTKProbe.pdb /DEBUG /INCREMENTAL:NO user32.lib || exit /b 1

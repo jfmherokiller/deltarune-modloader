@@ -16,7 +16,7 @@ draw_set_alpha(1);
 
 // box
 var bw = 420;
-var bh = 440;
+var bh = 466;
 var bx = cx + (cw - bw) / 2;
 var by = cy + (chh - bh) / 2;
 draw_set_color(c_black);
@@ -66,6 +66,64 @@ if (global.drcheat_page == 1)
     exit;
 }
 
+if (global.drcheat_page == 2)
+{
+    draw_text(bx + 50, by + 12, "ENEMIES");
+    var rows = drc_en_rows();
+    var r = global.drcheat_ensel;
+    var rx = bx + 50;
+    var vx = bx + 250;
+    var ry = by + 48;
+    var rh = 26;
+    var fight = drc_in_battle();
+    var yy = ry;
+    for (var i = 0; i < array_length(rows); i++)
+    {
+        var kind = rows[i][0];
+        var e = rows[i][1];
+        if (kind == 10)
+        {
+            // enemy header line before its HP row
+            yy += 6;
+            draw_set_color(c_aqua);
+            draw_text(rx - 10, yy, drc_en_name(e));
+            yy += rh;
+        }
+        var lab = "";
+        var v = "";
+        switch (kind)
+        {
+            case 0: lab = "Auto mercy"; v = (fight && drc_special_battle()) ? "(paused)" : (global.drcheat_automercy ? "ON" : "OFF"); break;
+            case 1: lab = "All: can spare"; break;
+            case 2: lab = "All: HP 1"; break;
+            case 10: lab = "HP"; v = "< " + string(global.monsterhp[e]) + " > / " + string(global.monstermaxhp[e]); break;
+            case 11: lab = "Mercy"; v = "< " + string(global.mercymod[e]) + "% >"; break;
+            case 12: lab = "Tired"; v = (global.monsterstatus[e] == 1) ? "YES" : "NO"; break;
+        }
+        var off = ((kind == 1 || kind == 2) && !fight) || ((kind == 0 || kind == 1) && fight && drc_special_battle());
+        draw_set_color((i == r) ? c_yellow : (off ? c_gray : c_white));
+        draw_text(rx + ((kind >= 10) ? 16 : 0), yy, lab);
+        draw_text(vx, yy, v);
+        if (i == r)
+            draw_sprite(spr_heart, 0, rx - 26, yy + 8);
+        yy += rh;
+    }
+    draw_set_color(c_gray);
+    if (!fight)
+        draw_text(rx, yy + 10, "(not in a battle)");
+    else if (drc_special_battle())
+        draw_text(rx, yy + 10, "(boss battle: mercy cheats off)");
+    draw_set_color(c_gray);
+    draw_text(bx + 20, by + bh - 34, "Z/</> change  SHIFT x10  X back");
+    if (drc_msgtime > 0)
+    {
+        draw_set_color(c_lime);
+        draw_text(vx, by + 12, drc_msg);
+    }
+    draw_set_color(c_white);
+    exit;
+}
+
 draw_text(bx + 50, by + 12, "CHEATS");
 
 var slot = clamp(global.drcheat_slot, 0, 2);
@@ -99,6 +157,7 @@ for (var i = 0; i < array_length(drc_rows); i++)
         case 9: v = (ch > 0) ? ("< " + string(global.mag[ch]) + " >") : "-"; break;
         case 10: v = (ch > 0) ? ("< " + string(global.maxhp[ch]) + " >  HP " + string(global.hp[ch])) : "-"; break;
         case 11: v = ">"; break;
+        case 12: v = ">"; break;
     }
     draw_text(vx, y0, v);
     if (sel)

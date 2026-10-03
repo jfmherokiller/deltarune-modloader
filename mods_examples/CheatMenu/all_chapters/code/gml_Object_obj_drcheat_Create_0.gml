@@ -9,19 +9,24 @@ if (!variable_global_exists("drcheat_open"))
     global.drcheat_nodmg = 0;
     global.drcheat_inftp = 0;
 }
+if (!variable_global_exists("drcheat_automercy"))
+{
+    global.drcheat_automercy = 0;
+    global.drcheat_ensel = 0;
+}
 if (!variable_global_exists("drcheat_invcat"))
 {
     global.drcheat_invcat = 0;
     global.drcheat_invsel = -1;
 }
 global.drcheat_open = 0;   // a fresh instance never starts inside an open menu
-global.drcheat_page = 0;   // 0 = main page, 1 = inventory
+global.drcheat_page = 0;   // 0 = main page, 1 = inventory, 2 = enemies
 drc_shot = -1;
 drc_hold = 0;
 drc_msg = "";
 drc_msgtime = 0;
 drc_names = ["?", "Kris", "Susie", "Ralsei", "Noelle"];
-drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Close"];
+drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Close"];
 
 // ---- inventory editor (dark world inventory: items, weapons, armor, key items)
 drc_inv_cats = ["Items", "Weapons", "Armor", "Key Items"];
@@ -136,4 +141,70 @@ drc_close = function()
     drc_shot = -1;
     global.drcheat_open = 0;
     snd_play(snd_smallswing);
+};
+
+
+// ---- enemy editor (battle only): the 3 enemy slots live in global.monster* arrays
+// the open menu deactivates every instance, so remember whether a battle was running when it opened
+drc_battle_open = 0;
+drc_in_battle = function()
+{
+    if (!variable_global_exists("monster") || !variable_global_exists("mercymod"))
+        return 0;
+    return global.drcheat_open ? drc_battle_open : instance_exists(obj_battlecontroller);
+};
+// scripted story/boss fights (Queen, Spamton NEO, Jevil, King...) start with specialbattle != 0;
+// forcing their spare state breaks the scripted ending (crash seen sparing Ch2 Queen), so mercy
+// cheats stay off there. Plain encounters use 0.
+drc_special_battle = function()
+{
+    return variable_global_exists("specialbattle") && global.specialbattle != 0;
+};
+drc_en_alive = function(_i)
+{
+    return global.monster[_i] == 1;
+};
+drc_en_mercymax = function(_i)
+{
+    var _m = 100;
+    if (variable_global_exists("mercymax") && is_real(global.mercymax[_i]))
+        _m = max(100, global.mercymax[_i]);
+    return _m;
+};
+// the battle's SPARE / Pacify checks mercy >= mercymax and status 1 (Tired)
+drc_en_spareable = function(_i)
+{
+    global.mercymod[_i] = drc_en_mercymax(_i);
+    global.monsterstatus[_i] = 1;
+};
+// rows: [kind, enemy]; 0 auto mercy, 1 all spareable, 2 all HP 1, 10 HP, 11 mercy, 12 tired
+drc_en_rows = function()
+{
+    var _r = [[0, -1], [1, -1], [2, -1]];
+    if (drc_in_battle())
+    {
+        var _sp = drc_special_battle();
+        for (var _i = 0; _i < 3; _i++)
+        {
+            if (drc_en_alive(_i))
+            {
+                array_push(_r, [10, _i]);
+                if (!_sp)
+                {
+                    array_push(_r, [11, _i]);
+                    array_push(_r, [12, _i]);
+                }
+            }
+        }
+    }
+    return _r;
+};
+drc_en_name = function(_i)
+{
+    var _n = "";
+    if (variable_global_exists("monstername") && is_string(global.monstername[_i]))
+        _n = global.monstername[_i];
+    if (_n == "")
+        _n = "Enemy " + string(_i + 1);
+    return _n;
 };

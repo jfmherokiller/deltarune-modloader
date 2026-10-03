@@ -15,12 +15,21 @@ if (!global.drcheat_open)
         global.inv = 30;
     if (global.drcheat_inftp && _hastp && global.tension < global.maxtension)
         global.tension = global.maxtension;
+    if (global.drcheat_automercy && drc_in_battle() && !drc_special_battle())
+    {
+        for (var i = 0; i < 3; i++)
+        {
+            if (drc_en_alive(i) && global.mercymod[i] < drc_en_mercymax(i))
+                drc_en_spareable(i);
+        }
+    }
 }
 
 // ---- open / close
-if (global.drcheat_open && global.drcheat_page == 1 && keyboard_check_pressed(ord("X")))
+if (global.drcheat_open && global.drcheat_page != 0 && keyboard_check_pressed(ord("X")))
 {
-    drc_inv_compact();
+    if (global.drcheat_page == 1)
+        drc_inv_compact();
     global.drcheat_page = 0;
     snd_play(snd_smallswing);
     exit;
@@ -32,6 +41,7 @@ if (keyboard_check_pressed(vk_f7) || (global.drcheat_open && keyboard_check_pres
         var sw = surface_get_width(application_surface);
         var sh = surface_get_height(application_surface);
         drc_shot = sprite_create_from_surface(application_surface, 0, 0, sw, sh, false, false, 0, 0);
+        drc_battle_open = instance_exists(obj_battlecontroller);
         audio_pause_all();
         // remember what was active so closing doesn't wake things the game deactivated itself
         drc_frozen = [];
@@ -132,6 +142,71 @@ if (global.drcheat_page == 1)
     exit;
 }
 
+
+// ---- enemy page
+if (global.drcheat_page == 2)
+{
+    var rows = drc_en_rows();
+    var nr = array_length(rows);
+    var r = clamp(global.drcheat_ensel, 0, nr - 1);
+    if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
+    if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
+    var kind = rows[r][0];
+    var e = rows[r][1];
+    var fight = drc_in_battle();
+    switch (kind)
+    {
+        case 0:
+            if (ok || step != 0) { global.drcheat_automercy = !global.drcheat_automercy; snd_play(snd_select); }
+            break;
+        case 1:
+            if (ok && fight && drc_special_battle())
+            {
+                drc_msg = "Not in boss battles"; drc_msgtime = 60; snd_play(snd_smallswing);
+            }
+            else if (ok && fight)
+            {
+                for (var i = 0; i < 3; i++)
+                    if (drc_en_alive(i)) drc_en_spareable(i);
+                drc_msg = "All can be spared"; drc_msgtime = 60; snd_play(snd_select);
+            }
+            break;
+        case 2:
+            if (ok && fight)
+            {
+                for (var i = 0; i < 3; i++)
+                    if (drc_en_alive(i)) global.monsterhp[i] = 1;
+                drc_msg = "Enemy HP set to 1"; drc_msgtime = 60; snd_play(snd_select);
+            }
+            break;
+        case 10:
+            if (step != 0)
+            {
+                global.monsterhp[e] = clamp(global.monsterhp[e] + step * (big ? 100 : 10), 1, max(1, global.monstermaxhp[e]));
+                snd_play(snd_menumove);
+            }
+            break;
+        case 11:
+            if (step != 0)
+            {
+                global.mercymod[e] = clamp(global.mercymod[e] + step * (big ? 100 : 10), 0, drc_en_mercymax(e));
+                snd_play(snd_menumove);
+            }
+            break;
+        case 12:
+            if (ok || step != 0)
+            {
+                global.monsterstatus[e] = (global.monsterstatus[e] == 1) ? 0 : 1;
+                snd_play(snd_select);
+            }
+            break;
+    }
+    global.drcheat_ensel = r;
+    if (drc_msgtime > 0)
+        drc_msgtime--;
+    exit;
+}
+
 // selected party member (skip empty slots)
 var slot = clamp(global.drcheat_slot, 0, 2);
 if (global.char[slot] <= 0)
@@ -203,6 +278,13 @@ switch (global.drcheat_sel)
         }
         break;
     case 12:
+        if (ok)
+        {
+            global.drcheat_page = 2;
+            snd_play(snd_select);
+        }
+        break;
+    case 13:
         if (ok)
         {
             drc_close();

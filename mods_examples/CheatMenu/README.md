@@ -13,7 +13,24 @@ freezes and a cheat overlay opens.
 | Character | ←/→ picks the party member for the stat rows |
 | AT / DF / MAG / Max HP | ←/→ ±1 (Max HP ±10; Shift ×10) |
 | Inventory... | Z opens the inventory editor (below) |
+| Enemies... | Z opens the enemy editor (below) |
 | Close | Z, X or F7 |
+
+### Enemy editor (battles)
+
+Open F7 during a battle, then **Enemies...**:
+
+| Row | Effect |
+|---|---|
+| Auto mercy | keeps every enemy at full mercy and Tired, so SPARE / Pacify always work (stays on after closing) |
+| All: can spare | full mercy + Tired for every enemy, once |
+| All: HP 1 | every enemy to 1 HP |
+| per enemy: HP / Mercy / Tired | ←/→ ±10 (Shift ±100); Z toggles Tired |
+
+Scripted story and boss fights (Chapter 2's Queen, Spamton NEO, Jevil, King...) are started
+with `global.specialbattle` set, and forcing their spare state crashes or breaks their scripted
+endings (seen sparing Queen). In those fights the mercy rows are hidden, auto mercy pauses and
+"All: can spare" refuses. HP editing still works there.
 
 ### Inventory editor
 
