@@ -13,6 +13,21 @@ if (!global.drcheat_open)
     }
     if (global.drcheat_nodmg && variable_global_exists("inv") && global.inv < 30)
         global.inv = 30;
+    // Ch3 game-show board: party health is obj_mainchara_board.myhealth (hearts), copied into global.hp
+    // by scr_board_battlehealth, and hits check the character's own iframes, not global.inv
+    var _mb = asset_get_index("obj_mainchara_board");
+    if (_mb >= 0 && (global.drcheat_lockhp || global.drcheat_nodmg))
+    {
+        var _lock = global.drcheat_lockhp;
+        var _nod = global.drcheat_nodmg;
+        with (_mb)
+        {
+            if (_lock && myhealth > 0 && myhealth < maxhealth)
+                myhealth = maxhealth;
+            if (_nod && iframes < 2)
+                iframes = 2;
+        }
+    }
     if (global.drcheat_inftp && _hastp && global.tension < global.maxtension)
         global.tension = global.maxtension;
     if (global.drcheat_automercy && drc_in_battle())
