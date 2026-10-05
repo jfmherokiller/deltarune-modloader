@@ -8,11 +8,48 @@ if (!global.drcheat_open)
         {
             var c = global.char[i];
             if (c > 0 && global.hp[c] < global.maxhp[c])
-                global.hp[c] = global.maxhp[c];
+            {
+                // a one-hit KO already marked them down (chardead); scr_heal revives them properly
+                if (global.hp[c] <= 0 && instance_exists(obj_battlecontroller))
+                    scr_heal(i, global.maxhp[c] - global.hp[c]);
+                else
+                    global.hp[c] = global.maxhp[c];
+            }
         }
     }
     if (global.drcheat_nodmg && variable_global_exists("inv") && global.inv < 30)
         global.inv = 30;
+    // Ch3 TV minigames: cooking show (obj_chefs_game), rhythm game (obj_rhythmgame), Susiezilla.
+    // assist keeps you from losing; top score sets each game's own score past its best grade
+    // (cooking: 640 = T, and >= the 400 goal ends the show as a win; rhythm: 28000 = the game's
+    // own debug top score; Susiezilla: 800+ = ultimate victory on the next defeated enemy).
+    if (global.drcheat_mgassist || global.drcheat_mgmax)
+    {
+        var _top = global.drcheat_mgmax;
+        global.drcheat_mgmax = 0;
+        var _o = asset_get_index("obj_chefs_game");
+        if (_o >= 0)
+            with (_o)
+            {
+                if (min_pts < 0) min_pts = 0;
+                if (_top && !gameover) scorepoints = max(scorepoints, 640);
+            }
+        _o = asset_get_index("obj_rhythmgame");
+        if (_o >= 0)
+            with (_o)
+            {
+                fame = max_fame;
+                if (_top) points = max(points, 28000);
+            }
+        _o = asset_get_index("obj_susiezilla_statue");
+        if (_o >= 0)
+            with (_o)
+                if (hp > 0) hp = maxhp;
+        _o = asset_get_index("obj_susiezilla_singlescreen_hud_score");
+        if (_o >= 0 && _top)
+            with (_o)
+                my_score = 999;
+    }
     // Ch3 game-show board: party health is obj_mainchara_board.myhealth (hearts), copied into global.hp
     // by scr_board_battlehealth, and hits check the character's own iframes, not global.inv
     var _mb = asset_get_index("obj_mainchara_board");
@@ -26,6 +63,33 @@ if (!global.drcheat_open)
                 myhealth = maxhealth;
             if (_nod && iframes < 2)
                 iframes = 2;
+        }
+    }
+    // Ch5 platformer: Kris has his own hp (30) and an invincible flag; get_hurt() checks it first
+    var _pp = asset_get_index("obj_plat_player");
+    if (_pp >= 0 && (global.drcheat_lockhp || global.drcheat_nodmg))
+    {
+        var _lock2 = global.drcheat_lockhp;
+        var _nod2 = global.drcheat_nodmg;
+        with (_pp)
+        {
+            if (_lock2 && hp < max_hp)
+                hp = max_hp;
+            if (_nod2 && !invincible)
+            {
+                invincible = true;
+                invincible_timer = 2;
+            }
+        }
+    }
+    // Ch4 Mike minigame: 3 lives, lost on hit
+    var _mk = asset_get_index("obj_mike_minigame_controller");
+    if (_mk >= 0 && (global.drcheat_lockhp || global.drcheat_nodmg))
+    {
+        with (_mk)
+        {
+            if (life > 0 && life < 3)
+                life = 3;
         }
     }
     if (global.drcheat_inftp && _hastp && global.tension < global.maxtension)
@@ -169,12 +233,27 @@ if (global.drcheat_page == 3)
     {
         if (r == 0)
             global.flag[1044] = clamp(global.flag[1044] + step * (big ? 1000 : 100), 0, 9999);
+        else if (r == 3)
+            global.drcheat_mgassist = !global.drcheat_mgassist;
+        else if (r == 4)
+        {
+        }
         else
         {
             var f = (r == 1) ? 1173 : 1174;
             global.flag[f] = clamp(global.flag[f] + step, 0, 5);
         }
         snd_play(snd_menumove);
+    }
+    if (ok && r == 3)
+    {
+        global.drcheat_mgassist = !global.drcheat_mgassist;
+        snd_play(snd_select);
+    }
+    if (ok && r == 4)
+    {
+        global.drcheat_mgmax = 1;
+        drc_msg = "Applied on close"; drc_msgtime = 60; snd_play(snd_select);
     }
     global.drcheat_tvsel = r;
     if (drc_msgtime > 0)

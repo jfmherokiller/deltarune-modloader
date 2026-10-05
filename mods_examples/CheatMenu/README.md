@@ -57,10 +57,18 @@ Re-run it after a game update:
 |---|---|
 | Points | the PTs counter (`global.flag[1044]`), ←/→ ±100 (Shift ±1000), max 9999 |
 | Board 1 rank / Board 2 rank | saved board result (`flag[1173]`/`[1174]`): Z C B A S T |
+| Minigame assist | cooking show: popularity never drains to a loss; rhythm game: fame stays full (no fail); Susiezilla: the statue doesn't break |
+| Minigame: top score | open F7 *during* a minigame, press Z, close: cooking show score → 640 (T), rhythm game points → 28000, Susiezilla score → 999 (ultimate victory) |
 
 The saved rank opens the ranking-room doors (C ≥ C, B ≥ B, A ≥ A) and T opens the T-Rank room.
 Finishing a board again overwrites it with the real result. The secret boss route isn't gated by
 score: it needs the hidden keys found on each board.
+
+### Chapter 4–5 notes
+
+- Lock HP revives a party member knocked out by a one-hit attack (via the game's `scr_heal`), instead of leaving them down at full HP.
+- Lock HP / No damage also cover Chapter 5's platformer Kris (own 30 HP + invincibility flag) and Chapter 4's Mike minigame (3 lives).
+- Some boss fights script a party member going down (Sound of Justice, Flowery, Pink, Orange/Green). Those scenes force HP themselves and still play; Sound of Justice also has a 4-turn fallback.
 
 ### Inventory editor
 

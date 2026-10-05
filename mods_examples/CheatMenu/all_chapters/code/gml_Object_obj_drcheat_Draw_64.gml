@@ -79,6 +79,10 @@ if (global.drcheat_page == 3)
         var v = "";
         if (i == 0)
             v = "< " + string(global.flag[1044]) + " >";
+        else if (i == 3)
+            v = global.drcheat_mgassist ? "ON" : "OFF";
+        else if (i == 4)
+            v = global.drcheat_mgmax ? "on close" : "Z";
         else
             v = "< " + drc_tv_letters[clamp(global.flag[(i == 1) ? 1173 : 1174], 0, 5)] + " >";
         draw_set_color((i == global.drcheat_tvsel) ? c_yellow : c_white);
@@ -88,11 +92,18 @@ if (global.drcheat_page == 3)
             draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
     }
     draw_set_color(c_gray);
-    var ty = ry + 4 * rh;
-    draw_text(rx - 20, ty, "Ranks are the saved result of each board.");
-    draw_text(rx - 20, ty + 24, "They open the ranking room doors");
-    draw_text(rx - 20, ty + 48, "(C, B, A) and the T-Rank room.");
-    draw_text(rx - 20, ty + 72, "A board you finish later overwrites it.");
+    var ty = ry + 6 * rh;
+    draw_text(rx - 20, ty, "Ranks: saved board result; they open");
+    draw_text(rx - 20, ty + 24, "the ranking room doors and T-Rank room.");
+    draw_text(rx - 20, ty + 56, "Minigames: cooking show, rhythm game,");
+    draw_text(rx - 20, ty + 80, "Susiezilla. Assist = can't lose.");
+    draw_text(rx - 20, ty + 104, "Top score: open F7 during the game.");
+    if (drc_msgtime > 0)
+    {
+        draw_set_color(c_lime);
+        draw_text(vx, by + 12, drc_msg);
+        draw_set_color(c_gray);
+    }
     draw_text(bx + 20, by + bh - 34, "</> change  SHIFT x10  X back");
     draw_set_color(c_white);
     exit;

@@ -35,7 +35,10 @@ global.drcheat_tvsel = 0;
 // flag 1044 = points (PTs), 1173/1174 = saved rank of board 1/2 (0 Z, 1 C, 2 B, 3 A, 4 S, 5 T).
 // The ranks unlock the ranking-room doors (A>=3, B>=2, C>=1) and the T-rank room (5).
 drc_tv_letters = ["Z", "C", "B", "A", "S", "T"];
-drc_tv_rows = ["Points", "Board 1 rank", "Board 2 rank"];
+drc_tv_rows = ["Points", "Board 1 rank", "Board 2 rank", "Minigame assist", "Minigame: top score"];
+if (!variable_global_exists("drcheat_mgassist"))
+    global.drcheat_mgassist = 0;
+global.drcheat_mgmax = 0;   // pending "top score"; applied after closing (minigame objects are frozen while open)
 
 // ---- inventory editor (dark world inventory: items, weapons, armor, key items)
 drc_inv_cats = ["Items", "Weapons", "Armor", "Key Items"];
