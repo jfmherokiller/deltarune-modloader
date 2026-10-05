@@ -14,6 +14,7 @@ freezes and a cheat overlay opens.
 | AT / DF / MAG / Max HP | ←/→ ±1 (Max HP ±10; Shift ×10) |
 | Inventory... | Z opens the inventory editor (below) |
 | Enemies... | Z opens the enemy editor (below) |
+| TV Show... | Chapter 3 only: Z opens the TV show page (below) |
 | Close | Z, X or F7 |
 
 ### Enemy editor (battles)
@@ -49,6 +50,17 @@ The list is generated per chapter from the game's own code by `tools/gen_nospare
 
 Re-run it after a game update:
 `DR_OUT_DIR=mods\CheatMenu\chapterN_windows\code UndertaleModCli load chapterN_windows\data.win -s tools\gen_nospare.csx`
+
+### TV show page (Chapter 3)
+
+| Row | Effect |
+|---|---|
+| Points | the PTs counter (`global.flag[1044]`), ←/→ ±100 (Shift ±1000), max 9999 |
+| Board 1 rank / Board 2 rank | saved board result (`flag[1173]`/`[1174]`): Z C B A S T |
+
+The saved rank opens the ranking-room doors (C ≥ C, B ≥ B, A ≥ A) and T opens the T-Rank room.
+Finishing a board again overwrites it with the real result. The secret boss route isn't gated by
+score: it needs the hidden keys found on each board.
 
 ### Inventory editor
 

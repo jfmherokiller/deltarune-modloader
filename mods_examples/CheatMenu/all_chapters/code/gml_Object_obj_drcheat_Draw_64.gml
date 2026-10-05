@@ -16,7 +16,7 @@ draw_set_alpha(1);
 
 // box
 var bw = 420;
-var bh = 466;
+var bh = 466 + (array_length(drc_rows) - 14) * 26;
 var bx = cx + (cw - bw) / 2;
 var by = cy + (chh - bh) / 2;
 draw_set_color(c_black);
@@ -62,6 +62,38 @@ if (global.drcheat_page == 1)
     if (variable_global_exists("darkzone") && !global.darkzone)
         draw_text(bx + 20, by + bh - 60, "(Light World items aren't listed)");
     draw_text(bx + 20, by + bh - 34, "</> item  SHIFT x5  DEL clear  X back");
+    draw_set_color(c_white);
+    exit;
+}
+
+if (global.drcheat_page == 3)
+{
+    draw_text(bx + 50, by + 12, "TV SHOW");
+    var rx = bx + 50;
+    var vx = bx + 250;
+    var ry = by + 48;
+    var rh = 26;
+    for (var i = 0; i < array_length(drc_tv_rows); i++)
+    {
+        var y0 = ry + i * rh;
+        var v = "";
+        if (i == 0)
+            v = "< " + string(global.flag[1044]) + " >";
+        else
+            v = "< " + drc_tv_letters[clamp(global.flag[(i == 1) ? 1173 : 1174], 0, 5)] + " >";
+        draw_set_color((i == global.drcheat_tvsel) ? c_yellow : c_white);
+        draw_text(rx, y0, drc_tv_rows[i]);
+        draw_text(vx, y0, v);
+        if (i == global.drcheat_tvsel)
+            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
+    }
+    draw_set_color(c_gray);
+    var ty = ry + 4 * rh;
+    draw_text(rx - 20, ty, "Ranks are the saved result of each board.");
+    draw_text(rx - 20, ty + 24, "They open the ranking room doors");
+    draw_text(rx - 20, ty + 48, "(C, B, A) and the T-Rank room.");
+    draw_text(rx - 20, ty + 72, "A board you finish later overwrites it.");
+    draw_text(bx + 20, by + bh - 34, "</> change  SHIFT x10  X back");
     draw_set_color(c_white);
     exit;
 }
@@ -156,6 +188,7 @@ for (var i = 0; i < array_length(drc_rows); i++)
         case 10: v = (ch > 0) ? ("< " + string(global.maxhp[ch]) + " >  HP " + string(global.hp[ch])) : "-"; break;
         case 11: v = ">"; break;
         case 12: v = ">"; break;
+        case 13: v = drc_has_tv ? ">" : ""; break;
     }
     draw_text(vx, y0, v);
     if (sel)

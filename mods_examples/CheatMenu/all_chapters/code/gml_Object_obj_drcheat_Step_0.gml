@@ -158,6 +158,31 @@ if (global.drcheat_page == 1)
 }
 
 
+// ---- Chapter 3 TV show page
+if (global.drcheat_page == 3)
+{
+    var nr = array_length(drc_tv_rows);
+    var r = clamp(global.drcheat_tvsel, 0, nr - 1);
+    if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
+    if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
+    if (step != 0)
+    {
+        if (r == 0)
+            global.flag[1044] = clamp(global.flag[1044] + step * (big ? 1000 : 100), 0, 9999);
+        else
+        {
+            var f = (r == 1) ? 1173 : 1174;
+            global.flag[f] = clamp(global.flag[f] + step, 0, 5);
+        }
+        snd_play(snd_menumove);
+    }
+    global.drcheat_tvsel = r;
+    if (drc_msgtime > 0)
+        drc_msgtime--;
+    exit;
+}
+
+
 // ---- enemy page
 if (global.drcheat_page == 2)
 {
@@ -305,6 +330,17 @@ switch (global.drcheat_sel)
         }
         break;
     case 13:
+        if (ok && drc_has_tv)
+        {
+            global.drcheat_page = 3;
+            snd_play(snd_select);
+        }
+        else if (ok)
+        {
+            drc_close();
+        }
+        break;
+    case 14:
         if (ok)
         {
             drc_close();

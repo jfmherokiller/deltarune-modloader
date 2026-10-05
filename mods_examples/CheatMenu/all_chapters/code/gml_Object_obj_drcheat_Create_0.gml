@@ -27,6 +27,15 @@ drc_msg = "";
 drc_msgtime = 0;
 drc_names = ["?", "Kris", "Susie", "Ralsei", "Noelle"];
 drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Close"];
+// Chapter 3 only: TV show page (points + saved board rankings)
+drc_has_tv = global.chapter == 3;
+if (drc_has_tv)
+    drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "TV Show...", "Close"];
+global.drcheat_tvsel = 0;
+// flag 1044 = points (PTs), 1173/1174 = saved rank of board 1/2 (0 Z, 1 C, 2 B, 3 A, 4 S, 5 T).
+// The ranks unlock the ranking-room doors (A>=3, B>=2, C>=1) and the T-rank room (5).
+drc_tv_letters = ["Z", "C", "B", "A", "S", "T"];
+drc_tv_rows = ["Points", "Board 1 rank", "Board 2 rank"];
 
 // ---- inventory editor (dark world inventory: items, weapons, armor, key items)
 drc_inv_cats = ["Items", "Weapons", "Armor", "Key Items"];
