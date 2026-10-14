@@ -14,6 +14,7 @@ freezes and a cheat overlay opens.
 | AT / DF / MAG / Max HP | ←/→ ±1 (Max HP ±10; Shift ×10) |
 | Inventory... | Z opens the inventory editor (below) |
 | Enemies... | Z opens the enemy editor (below) |
+| Recruits... | Z opens per-enemy recruit counts (Chapters 2–5; below) |
 | TV Show... | Chapter 3 only: Z opens the TV show page (below) |
 | Close | Z, X or F7 |
 
@@ -50,6 +51,20 @@ The list is generated per chapter from the game's own code by `tools/gen_nospare
 
 Re-run it after a game update:
 `DR_OUT_DIR=mods\CheatMenu\chapterN_windows\code UndertaleModCli load chapterN_windows\data.win -s tools\gen_nospare.csx`
+
+### Recruit editor (Chapters 2–5)
+
+Open **F7 → Recruits...**. Each row shows an enemy type's recruited count and the count
+required to finish recruitment. Use ↑/↓ to choose a type, ←/→ to adjust by one (hold Shift
+for five), and C/Delete to reset a defeated (“LOST”) type to zero. X returns to the main page.
+The editor lists recruitable enemy types from the current and preceding chapters, not bosses.
+Chapter 1 has no recruitment system, so the row is unavailable there.
+
+The game stores each type as `global.flag[600 + enemy ID] = count / required`, with `-1`
+marking a lost recruit. The editor writes the proper fraction using the required count from
+the game's `scr_recruit_info`, rather than changing a cosmetic total. Changes affect the
+current save when the game saves; make a backup before editing story progress. Entering a
+positive count for a LOST type deliberately clears its lost state.
 
 ### TV show page (Chapter 3)
 

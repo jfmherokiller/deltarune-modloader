@@ -66,6 +66,34 @@ if (global.drcheat_page == 1)
     exit;
 }
 
+if (global.drcheat_page == 4)
+{
+    draw_text(bx + 50, by + 12, "RECRUITS");
+    var rx = bx + 50;
+    var ry = by + 48;
+    var rh = 26;
+    var vis = 12;
+    var top = clamp(global.drcheat_recsel - 5, 0, max(0, drc_rec_count - vis));
+    for (var i = 0; i < vis && top + i < drc_rec_count; i++)
+    {
+        var r = top + i;
+        var y0 = ry + i * rh;
+        var val = drc_rec_current(r);
+        draw_set_color(r == global.drcheat_recsel ? c_yellow : (val < 0 ? c_gray : c_white));
+        draw_text(rx, y0, drc_rec_names[r]);
+        draw_text(bx + 290, y0, val < 0 ? "LOST" : string(val) + "/" + string(drc_rec_max[r]));
+        if (r == global.drcheat_recsel)
+            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
+    }
+    draw_set_color(c_gray);
+    if (top > 0) draw_text(bx + bw - 40, ry, "^");
+    if (top + vis < drc_rec_count) draw_text(bx + bw - 40, ry + (vis - 1) * rh, "v");
+    draw_text(bx + 20, by + bh - 60, "LOST: this recruit was defeated.");
+    draw_text(bx + 20, by + bh - 34, "</> +/-1  SHIFT x5  C reset  X back");
+    draw_set_color(c_white);
+    exit;
+}
+
 if (global.drcheat_page == 3)
 {
     draw_text(bx + 50, by + 12, "TV SHOW");
@@ -199,7 +227,8 @@ for (var i = 0; i < array_length(drc_rows); i++)
         case 10: v = (ch > 0) ? ("< " + string(global.maxhp[ch]) + " >  HP " + string(global.hp[ch])) : "-"; break;
         case 11: v = ">"; break;
         case 12: v = ">"; break;
-        case 13: v = drc_has_tv ? ">" : ""; break;
+        case 13: v = drc_rec_count > 0 ? ">" : "-"; break;
+        case 14: v = drc_has_tv ? ">" : ""; break;
     }
     draw_text(vx, y0, v);
     if (sel)

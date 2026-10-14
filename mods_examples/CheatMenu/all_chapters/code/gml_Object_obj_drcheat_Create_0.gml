@@ -20,17 +20,17 @@ if (!variable_global_exists("drcheat_invcat"))
     global.drcheat_invsel = -1;
 }
 global.drcheat_open = 0;   // a fresh instance never starts inside an open menu
-global.drcheat_page = 0;   // 0 = main page, 1 = inventory, 2 = enemies
+global.drcheat_page = 0;   // 0 main, 1 inventory, 2 enemies, 3 TV show, 4 recruits
 drc_shot = -1;
 drc_hold = 0;
 drc_msg = "";
 drc_msgtime = 0;
 drc_names = ["?", "Kris", "Susie", "Ralsei", "Noelle"];
-drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Close"];
+drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "Close"];
 // Chapter 3 only: TV show page (points + saved board rankings)
 drc_has_tv = global.chapter == 3;
 if (drc_has_tv)
-    drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "TV Show...", "Close"];
+    drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "TV Show...", "Close"];
 global.drcheat_tvsel = 0;
 // flag 1044 = points (PTs), 1173/1174 = saved rank of board 1/2 (0 Z, 1 C, 2 B, 3 A, 4 S, 5 T).
 // The ranks unlock the ranking-room doors (A>=3, B>=2, C>=1) and the T-rank room (5).
@@ -39,6 +39,39 @@ drc_tv_rows = ["Points", "Board 1 rank", "Board 2 rank", "Minigame assist", "Min
 if (!variable_global_exists("drcheat_mgassist"))
     global.drcheat_mgassist = 0;
 global.drcheat_mgmax = 0;   // pending "top score"; applied after closing (minigame objects are frozen while open)
+
+// Recruitment is stored as global.flag[600 + enemy ID] = recruited / required.
+// Use the same per-type IDs as the game's chapter recruit lists; do not include bosses.
+if (!variable_global_exists("drcheat_recsel")) global.drcheat_recsel = 0;
+drc_rec_ids = [];
+if (global.chapter >= 2)
+{
+    if (global.chapter >= 1)
+        drc_rec_ids = array_concat(drc_rec_ids, [5, 6, 11, 13, 14, 15, 22, 23]);
+    if (global.chapter >= 2)
+        drc_rec_ids = array_concat(drc_rec_ids, [30, 31, 32, 33, 34, 35, 36, 40, 42, 44]);
+    if (global.chapter >= 3)
+        drc_rec_ids = array_concat(drc_rec_ids, [54, 55, 56, 57, 58, 59, 60, 61]);
+    if (global.chapter >= 4)
+        drc_rec_ids = array_concat(drc_rec_ids, [62, 63, 64, 65, 66, 67, 68, 69]);
+    if (global.chapter >= 5)
+        drc_rec_ids = array_concat(drc_rec_ids, [70, 71, 72, 73, 74, 75, 76, 77]);
+}
+drc_rec_count = array_length(drc_rec_ids);
+drc_rec_names = [];
+drc_rec_max = [];
+for (var _r = 0; _r < drc_rec_count; _r++)
+{
+    var _info = scr_drcheat_recruit_info(drc_rec_ids[_r]);
+    drc_rec_names[_r] = _info[0];
+    drc_rec_max[_r] = max(1, _info[1]);
+}
+drc_rec_current = function(_r)
+{
+    var _v = global.flag[600 + drc_rec_ids[_r]];
+    if (_v < 0) return -1; // the game marks lost recruits with -1
+    return clamp(round(_v * drc_rec_max[_r]), 0, drc_rec_max[_r]);
+};
 
 // ---- inventory editor (dark world inventory: items, weapons, armor, key items)
 drc_inv_cats = ["Items", "Weapons", "Armor", "Key Items"];

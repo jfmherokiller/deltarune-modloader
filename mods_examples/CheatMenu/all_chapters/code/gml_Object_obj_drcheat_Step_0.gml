@@ -222,6 +222,32 @@ if (global.drcheat_page == 1)
 }
 
 
+// ---- recruit page: left/right adjusts the count; C/Del resets a lost type to zero
+if (global.drcheat_page == 4)
+{
+    var nr = drc_rec_count;
+    var r = clamp(global.drcheat_recsel, 0, max(0, nr - 1));
+    if (nr > 0)
+    {
+        if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
+        if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
+        var _cur = drc_rec_current(r);
+        if (step != 0)
+        {
+            var _next = clamp(max(0, _cur) + step * (big ? 5 : 1), 0, drc_rec_max[r]);
+            global.flag[600 + drc_rec_ids[r]] = _next / drc_rec_max[r];
+            snd_play(snd_menumove);
+        }
+        if (keyboard_check_pressed(vk_delete) || keyboard_check_pressed(vk_backspace) || keyboard_check_pressed(ord("C")))
+        {
+            global.flag[600 + drc_rec_ids[r]] = 0;
+            snd_play(snd_smallswing);
+        }
+    }
+    global.drcheat_recsel = r;
+    exit;
+}
+
 // ---- Chapter 3 TV show page
 if (global.drcheat_page == 3)
 {
@@ -409,21 +435,23 @@ switch (global.drcheat_sel)
         }
         break;
     case 13:
+        if (ok)
+        {
+            if (drc_rec_count > 0) global.drcheat_page = 4;
+            else { drc_msg = "Recruits begin in Chapter 2"; drc_msgtime = 60; }
+            snd_play(snd_select);
+        }
+        break;
+    case 14:
         if (ok && drc_has_tv)
         {
             global.drcheat_page = 3;
             snd_play(snd_select);
         }
-        else if (ok)
-        {
-            drc_close();
-        }
+        else if (ok) drc_close();
         break;
-    case 14:
-        if (ok)
-        {
-            drc_close();
-        }
+    case 15:
+        if (ok) drc_close();
         break;
 }
 if (drc_msgtime > 0)
