@@ -46,16 +46,28 @@ if (!variable_global_exists("drcheat_recsel")) global.drcheat_recsel = 0;
 drc_rec_ids = [];
 if (global.chapter >= 2)
 {
-    if (global.chapter >= 1)
-        drc_rec_ids = array_concat(drc_rec_ids, [5, 6, 11, 13, 14, 15, 22, 23]);
-    if (global.chapter >= 2)
-        drc_rec_ids = array_concat(drc_rec_ids, [30, 31, 32, 33, 34, 35, 36, 40, 42, 44]);
+    drc_rec_ids = [5, 6, 11, 13, 14, 15, 22, 23];
+    var _ids = [30, 31, 32, 33, 34, 35, 36, 40, 42, 44];
+    for (var _i = 0; _i < array_length(_ids); _i++)
+        array_push(drc_rec_ids, _ids[_i]);
     if (global.chapter >= 3)
-        drc_rec_ids = array_concat(drc_rec_ids, [54, 55, 56, 57, 58, 59, 60, 61]);
+    {
+        var _ids = [54, 55, 56, 57, 58, 59, 60, 61];
+        for (var _i = 0; _i < array_length(_ids); _i++)
+            array_push(drc_rec_ids, _ids[_i]);
+    }
     if (global.chapter >= 4)
-        drc_rec_ids = array_concat(drc_rec_ids, [62, 63, 64, 65, 66, 67, 68, 69]);
+    {
+        var _ids = [62, 63, 64, 65, 66, 67, 68, 69];
+        for (var _i = 0; _i < array_length(_ids); _i++)
+            array_push(drc_rec_ids, _ids[_i]);
+    }
     if (global.chapter >= 5)
-        drc_rec_ids = array_concat(drc_rec_ids, [70, 71, 72, 73, 74, 75, 76, 77]);
+    {
+        var _ids = [70, 71, 72, 73, 74, 75, 76, 77];
+        for (var _i = 0; _i < array_length(_ids); _i++)
+            array_push(drc_rec_ids, _ids[_i]);
+    }
 }
 drc_rec_count = array_length(drc_rec_ids);
 drc_rec_names = [];
