@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; media-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'">
+<title>Runner Studio</title>
+<link rel="stylesheet" href="studio.css">
+<link rel="stylesheet" href="runtime-inspector.css">
+</head>
+<body>
+<header class="menubar"><span class="brand"><b>R</b> RUNNER STUDIO</span><span class="project" id="project-name">No mod open</span><span class="edition">Runtime workspace · Preview</span></header>
+<nav class="toolbar" aria-label="Workspace controls">
+<button id="open-mod" class="primary">Open Mod</button><button id="save" disabled title="Save to loose file (Ctrl+S)">Save</button><button id="quick-open" disabled title="Go to file (Ctrl+P)">Go to file</button><button id="find" disabled title="Search saved files (Ctrl+Shift+F)">Find in files</button>
+<span class="divider"></span><label>Scope <select id="scope" disabled><option value="*">All resources</option></select></label>
+<span class="grow"></span><button id="connect">Connect</button><button id="apply" disabled title="Live replacement requires a verified game-specific backend">Apply live</button>
+</nav>
+<main class="layout">
+<aside id="inspector" class="pane inspector"><h2>Inspector</h2><div id="resource-inspector"><p class="muted inset">Select a resource to inspect its properties.</p></div><section class="runtime"><h2>Runtime <span id="runtime-status">Disconnected</span></h2><div id="runtime-details" class="inset muted">Connect to a game running the RunnerEditor bridge. No process is attached.</div></section></aside>
+<section class="workspace pane"><div class="workspace-heading"><span>Workspace 1</span><span id="workspace-mode">Loose files</span></div><nav class="workspace-switch" aria-label="Workspace view"><button id="show-files" class="active" aria-pressed="true">File editor</button><button id="show-runtime" aria-pressed="false">Runtime Explorer</button></nav><div id="file-workspace"><div id="tabs" role="tablist" aria-label="Open resources"></div><div id="event-strip" hidden></div><div id="document-area"><div id="welcome"><div class="welcome-mark">R</div><h1>Your game. Your workspace.</h1><p>Open a loose-mod folder to edit scripts, object events, sprites, and sounds.</p><dl><dt>Ctrl + P</dt><dd>Find a resource</dd><dt>Ctrl + S</dt><dd>Save the current file</dd><dt>Ctrl + Shift + F</dt><dd>Search across saved files</dd></dl><p class="muted">Game files stay untouched. Saving does not apply changes to a running game.</p></div><div id="code-editor" hidden></div><div id="asset-preview" hidden></div></div><div class="document-status"><span id="document-path">No resource selected</span><span id="cursor">—</span></div></div>
+<section id="runtime-explorer" aria-label="Runtime Explorer" hidden>
+  <header class="explorer-header"><div><h1>Runtime Explorer</h1><p id="runtime-context" class="muted">No process attached</p></div><span class="readonly-badge">Read-only</span></header>
+  <nav class="explorer-tabs" aria-label="Runtime view"><button id="runtime-globals" class="active" aria-pressed="true">Globals</button><button id="runtime-instances" aria-pressed="false">Instances</button></nav>
+  <p id="runtime-notice" role="status">Connect to a runtime to inspect variables. No mod folder is required.</p>
+  <div id="runtime-content" hidden>
+    <section id="runtime-instance-browser" aria-label="Loaded instances" hidden>
+      <div class="explorer-actions"><h2>Objects / instances</h2><button id="runtime-refresh-instances">Refresh instances</button></div>
+      <label class="explorer-filter">Filter loaded instances<input id="runtime-instance-filter" type="search" aria-label="Filter loaded instances" placeholder="Object name or instance ID…"></label>
+      <div id="runtime-object-groups"></div><p id="runtime-instance-status" class="muted" role="status"></p><button id="runtime-more-instances" hidden>Load more instances</button>
+    </section>
+    <section class="runtime-field-panel" aria-label="Typed runtime fields">
+      <div class="explorer-actions"><h2 id="runtime-field-title">Global variables</h2><button id="runtime-refresh-fields">Refresh fields</button></div>
+      <label class="explorer-filter">Filter loaded fields<input id="runtime-field-filter" type="search" aria-label="Filter loaded fields" placeholder="Name, type, source or value…"></label>
+      <p id="runtime-field-status" class="muted" role="status"></p>
+      <div class="runtime-table-scroll"><table id="runtime-fields"><thead><tr><th scope="col">Name</th><th scope="col">Type</th><th scope="col">Source</th><th scope="col">Value</th></tr></thead><tbody></tbody></table></div>
+      <button id="runtime-more-fields" hidden>Load more fields</button>
+    </section>
+  </div>
+  <footer class="explorer-footer"><span id="runtime-sample-age">No variable sample</span><p id="runtime-limits">64 rows per request · 4,096 loaded rows per list maximum. Names and values are 512-byte previews (type labels: 64 bytes); bridge previews may be truncated. Nested values are not expanded. Filters search loaded rows only.</p><p>Manual refresh only. Pages are samples, not an atomic snapshot. Refresh resets loaded pages; no writes or live Apply.</p></footer>
+</section></section>
+<aside id="asset-browser" class="pane assets"><h2>Asset Browser <span id="resource-count">0</span></h2><div class="filter-wrap"><input id="resource-filter" type="search" placeholder="Filter resources…" aria-label="Filter resources"></div><div id="tree" role="tree" aria-label="Resources"><p class="muted inset">Open a mod to browse its resources.</p></div></aside>
+<section class="output pane"><div class="output-bar"><button id="show-output" class="active">Output</button><button id="show-results">Search Results <span id="match-count"></span></button><span class="grow"></span><button id="clear-output">Clear</button></div><div id="log" role="log"><div>Runner Studio ready. Open a mod folder or connect to a runtime bridge.</div></div><div id="results" hidden></div></section>
+</main>
+<footer><span id="status-message" role="status">Ready</span><span class="grow"></span><span>Local files · No rebuilt data.win</span><span class="footer-divider">|</span><span id="save-state">No changes</span></footer>
+<dialog id="picker"><form method="dialog" class="dialog-header"><h2 id="picker-title">Go to file</h2><button aria-label="Close dialog">×</button></form><input id="picker-input" placeholder="Search resource name…" aria-label="Search resource name"><div id="picker-results"></div><p class="muted dialog-foot">Enter to open · Esc to close</p></dialog>
+<dialog id="search-dialog"><form id="search-form"><h2>Find in saved files</h2><input id="search-input" aria-label="Search text" placeholder="Text to find…" required><p class="muted">Literal search in the mod folder. Unsaved buffers are not included.</p><div class="dialog-actions"><button type="button" id="cancel-search">Cancel</button><button class="primary" type="submit">Search</button></div></form></dialog>
+<dialog id="runtime-dialog"><form method="dialog" class="dialog-header"><h2>Connect to a runtime</h2><button aria-label="Close connection dialog">×</button></form><p class="muted">Only local RunnerEditor bridges are listed. Connecting is read-only.</p><div id="runtime-list"></div><button id="refresh-runtimes">Refresh</button></dialog>
+<script src="../node_modules/ace-builds/src-noconflict/ace.js"></script>
+<script src="gml-mode.js"></script>
+<script src="../node_modules/ace-builds/src-noconflict/mode-diff.js"></script>
+<script src="../node_modules/ace-builds/src-noconflict/ext-language_tools.js"></script>
+<script src="runtime-inspector.js"></script>
+<script src="studio.js"></script>
+</body>
+</html>

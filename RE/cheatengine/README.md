@@ -12,6 +12,27 @@ when the hashmap rehashes, which is why Cheat Engine's pointer scanner produced 
 long, fragile multi-level chains. The script sidesteps that: it walks the hashmap, locks
 onto each variable's stable **`var_id`**, and re-resolves the real address every tick.
 
+## GameMaker runner dissector (`runner_dissector.lua`)
+
+Mono-dissector-style browser for any GameMaker game. Copy it to `<Cheat Engine>\autorun\`,
+attach CE to the game, then **GameMaker → Dissect runner...**: Globals and Instances (grouped
+by object) → variables with their live RValue addresses. Right-click a variable for *Add to
+address list*, *Register symbol*, *Browse memory here*, *Copy address*.
+
+* **Injected backend** (preferred): needs `RunnerEditor.dll` loaded by Aurie/YYToolkit; reads the
+  read-only `\\.\pipe\RunnerCE-<pid>`. Works for any YYToolkit-supported game.
+* **External fallback**: no injection; walks DELTARUNE's runner memory (layout below). Globals
+  and raw instances (no object names).
+* Console: `gm_backend()`, `gm_globals()`, `gm_instances()`, `gm_members(id)`, `gm_find('gold')`,
+  `gm_profile()`.
+* **Game profiles** (*GameMaker → Add game cheat entries*): named entries resolved by
+  object/variable name on each use, so they survive restarts — re-run after relaunching.
+  Built in: Dwarf Eats Mountain (`oSys.gold`, `prestigePoints`, `soul`, `mithril`, `dwarves`,
+  `faith`, mountain level/health, OPM/DPM) and DELTARUNE (`global.gold`, `chapter`, `plot`).
+  Add games from another autorun file via `GMRunner.profiles['Game.exe'] = {title=..., entries={{label, object|'global', var}}}`.
+* Records: real/bool → Double, int32 → 4 Bytes, int64 → 8 Bytes, string → pointer string.
+  Addresses are valid until the variable/instance is destroyed; Refresh after room changes.
+
 ## Quick start
 
 1. Launch DELTARUNE, open Cheat Engine, attach to `DELTARUNE.exe`.

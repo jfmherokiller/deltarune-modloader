@@ -1,5 +1,54 @@
 # TODO / Workflow
 
+## Runtime editor (in progress)
+
+- [x] Game-independent desktop authoring foundation in `../editor/` (working name Runner Studio),
+  using the modern GameMaker / Studio 2 arrangement with a GMEdit-inspired coding workflow.
+  Generic root loose-mod folders and DELTARUNE chapter scopes are covered by tests.
+- [x] Read-only YYToolkit bridge built with isolated native/Node transport tests; runner API
+  calls stay in its object-call callback. No DELTARUNE-only globals/object names in core.
+  Verification: 79 backend/protocol tests, 8 Electron workflows, 4 native test
+  executables, and native-to-Node inspector interop (40 sequential requests).
+  Hot unloading is unsupported.
+- [x] Installed `RunnerEditor.dll` alongside the existing DELTARUNE Aurie plugins;
+  verified copied bytes, launched through Steam, and read fresh live snapshots from
+  the DELTARUNE process in `PLACE_CHAPTER_SELECT_2x` with an advancing event counter.
+- [x] Cheat Engine "GameMaker" dissector (`cheatengine/runner_dissector.lua`, CE autorun),
+  modelled on CE's Mono/.NET dissectors. Injected backend = `RunnerCE-<pid>` pipe in
+  RunnerEditor.dll (RValue/CInstance addresses, CE does writes); external fallback walks the
+  DELTARUNE layout with no injection. Verified live in CE 7.x on Ch2: both backends list 1,056
+  globals; injected lists instances by object with members; address-list record reads back.
+- [x] CE dissector on Dwarf Eats Mountain (YYC, 2026-10-09): injected backend listed 2,579
+  globals (2,578/2,579 slots matched kind+value via ReadProcessMemory; the miss was ticking `dt`),
+  instances grouped by object (oSys 391 members, 372/372 slot kinds matched); CE UI + record OK.
+- [x] CE game profiles (2026-10-18): Dwarf HUD currencies live in `oSys` (one contiguous block:
+  prestigePoints, faith, soul, mithril, dwarves, gold). CE wrote gold +1000, the game kept it
+  (pipe read 1.5 s later), then restored. Crown icon assumed = `prestigePoints` (`faith` also 1).
+- [ ] CE dissector next: symbol lookup callback (`global.gold`), array element expansion,
+  CInstance structure dissect, find-instances-of-object.
+- [ ] Verify editor reconnection after a DELTARUNE chapter transition.
+- [x] Verify the bridge live in Dwarf Eats Mountain separately (done via the CE pipe run above;
+  same DLL, same sampler as the editor's inspector pipe).
+  Earlier Dwarf logs reported a **YYC** runner and 19 successful probe checks.
+- [x] Documented the UnityExplorer-inspired fallback in `../editor/LIVE_INSPECTOR_PLAN.md`:
+  runtime Globals/Instances browser, typed edits, readback, watches, conditional undo.
+  This is a core track independent of live asset/script replacement; writes are not enabled.
+- [x] Implement read-only global/instance enumeration and typed property panels.
+  Installed the upgraded connector with backup; verified live launcher reads (110
+  globals, 8 instances), then Chapter 3 `room_dw_green_room` (1,555 unique globals,
+  76 unique instance IDs). Actual Electron browsing inspected 64 instances, loaded
+  every global page, and cleared values on disconnect without renderer errors.
+  Fields are paged/read-only; arrays and structs are summaries, not expandable.
+  No hard frame-time guarantee inside YYTK name enumeration; see runtime README.
+- [ ] Add explicit scalar writes on the runner thread with lifetime/type checks,
+  expected-value conflicts, readback, and conditional undo; test VM and YYC separately.
+- [ ] Add bounded array/struct editing and opt-in freeze after scalar safety is verified.
+- [ ] Integrate GMEdit-specific semantic tools; Ace alone is not GMEdit integration.
+- [ ] Separate live sprite/sound reload, VM code replacement, and YYC-native detours.
+  Do not reuse DELTARUNE hook offsets or assume UTMT bytecode replacement works on YYC.
+- See `../editor/ARCHITECTURE.md` for shared-core and game-adapter boundaries.
+
+
 Durable notes so work can be picked up later. Two parallel tracks:
 
 - **Track A** — extend the static RE of `DELTARUNE.exe`: more function names, more types.

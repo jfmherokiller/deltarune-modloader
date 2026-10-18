@@ -1,0 +1,54 @@
+/* Central, read-only runtime workspace. Authoring panes keep their own layout. */
+#file-workspace{display:flex;flex-direction:column;flex:1;min-height:0}
+.workspace-heading,.workspace-switch{flex-shrink:0}
+.workspace-switch{display:flex;gap:3px;padding:4px 7px;background:#292c32;border-bottom:1px solid var(--border)}
+.workspace-switch button{font-size:11px;color:var(--muted)}
+.workspace-switch button.active,.explorer-tabs button.active{background:#454d40;color:#d6e9c7;border-bottom:2px solid var(--accent)}
+#runtime-explorer{display:flex;flex:1;flex-direction:column;min-height:0;overflow:auto;background:var(--editor);container-type:inline-size}
+.explorer-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px 8px;flex-shrink:0}
+.explorer-header h1{font-size:19px;margin:0 0 5px}
+.explorer-header p{margin:0;overflow-wrap:anywhere}
+.readonly-badge{border:1px solid #66765b;background:#343d30;color:#bfd5ad;padding:4px 8px;border-radius:3px;white-space:nowrap;font-size:11px}
+.explorer-tabs{display:flex;gap:4px;padding:0 16px 8px;border-bottom:1px solid #3b4048;flex-shrink:0}
+.explorer-tabs button{min-width:84px}
+#runtime-notice{padding:12px 16px;margin:0;background:#333930;color:#ccdcbf;line-height:1.6;overflow-wrap:anywhere;flex-shrink:0}
+#runtime-content{flex:1;min-height:180px;display:flex;padding:12px 16px;gap:16px}
+#runtime-content.with-instances{display:grid;grid-template-columns:minmax(150px,30%) minmax(0,1fr)}
+#runtime-instance-browser,.runtime-field-panel{display:flex;flex-direction:column;min-width:0;min-height:0}
+.runtime-field-panel{flex:1}
+#runtime-instance-browser{border-right:1px solid #3e434c;padding-right:12px}
+.explorer-actions{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:9px;flex-shrink:0}
+.explorer-actions h2{color:#d6e4cc;font-size:12px;overflow-wrap:anywhere}
+.explorer-actions button,#runtime-more-fields,#runtime-more-instances{border:1px solid #535b4d;background:#343d30;font-size:11px;align-self:flex-start}
+.explorer-filter{display:flex;flex-direction:column;gap:5px;font-size:11px;color:var(--muted);flex-shrink:0}
+.explorer-filter input{width:100%}
+#runtime-field-status,#runtime-instance-status{font-size:11px;margin:8px 0;line-height:1.6;flex-shrink:0;overflow-wrap:anywhere}
+#runtime-object-groups{overflow:auto;flex:1;min-height:40px;margin-top:10px}
+#runtime-object-groups details{margin-bottom:8px}
+#runtime-object-groups summary{cursor:pointer;color:#c7d8bb;padding:5px 2px;overflow-wrap:anywhere}
+#runtime-object-groups button{display:block;width:100%;text-align:left;margin-top:2px;padding-left:16px;font:12px Consolas,monospace}
+#runtime-object-groups button.selected{background:#414b3b;color:#d0e6be;border-left:2px solid var(--accent)}
+.runtime-table-scroll{flex:1;min-height:80px;overflow:auto;border:1px solid #41464e;background:#24272d}
+#runtime-fields{width:100%;border-collapse:separate;border-spacing:0;font:11px/1.65 Consolas,monospace;table-layout:fixed;min-width:380px}
+#runtime-fields th{position:sticky;top:0;background:#393e45;color:#c7cdc6;text-align:left;font:11px 'Segoe UI',sans-serif;padding:8px;border-bottom:1px solid #52594e;z-index:1}
+#runtime-fields th:nth-child(1){width:26%}
+#runtime-fields th:nth-child(2){width:17%}
+#runtime-fields th:nth-child(3){width:17%}
+#runtime-fields th:nth-child(4){width:40%}
+#runtime-fields td{padding:7px 8px;vertical-align:top;border-bottom:1px solid #363b43;overflow-wrap:anywhere;white-space:pre-wrap;user-select:text}
+#runtime-fields tr:nth-child(even){background:#292d33}
+#runtime-fields td:nth-child(2){color:#b5c9a3}
+#runtime-fields td:nth-child(3){color:#a7afb9}
+.runtime-value{color:#e1d3b3}
+#runtime-more-fields,#runtime-more-instances{margin-top:9px;flex-shrink:0}
+#runtime-explorer .runtime-error{color:#f0ad9b}
+#runtime-explorer .explorer-footer{display:block;height:auto;padding:10px 16px;background:#2b3036;border-top:1px solid #41464e;font-size:10px;line-height:1.5;flex-shrink:0;color:var(--muted)}
+.explorer-footer p{margin:4px 0 0}
+#runtime-sample-age{color:#c0d2b2;overflow-wrap:anywhere}
+@container(max-width:620px){
+  #runtime-content.with-instances{display:flex;flex-direction:column;min-height:350px}
+  #runtime-instance-browser{max-height:170px;flex-shrink:0;border-right:0;border-bottom:1px solid #3e434c;padding:0 0 10px}
+  #runtime-object-groups{min-height:40px}
+  #runtime-instance-browser .explorer-filter{flex-direction:row;align-items:center}
+  #runtime-instance-browser .explorer-filter input{flex:1}
+}

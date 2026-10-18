@@ -1,0 +1,19 @@
+{
+  "name": "runner-studio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Loose-mod authoring and runtime inspection for compatible GameMaker games",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "test:ui": "node --test tests/ui.e2e.cjs"
+  },
+  "dependencies": {
+    "ace-builds": "1.44.0"
+  },
+  "devDependencies": {
+    "electron": "44.7.0",
+    "playwright": "1.64.0"
+  }
+}
