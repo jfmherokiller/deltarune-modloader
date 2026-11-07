@@ -49,8 +49,15 @@ constexpr size_t kVmBufferSize = 0x30;
 
 static DWORD SehExecute(PFN_CodeExecute fn, CInstance* self, void* code, RValue* result, bool* ret)
 {
+#ifdef YYTK_HAS_EXECUTE_CODE_OBJECT
+	// YYToolkit with ExecuteCodeObject (AurieFramework/YYToolkit#90): no trampoline lookup.
+	UNREFERENCED_PARAMETER(fn);
+	__try { *ret = AurieSuccess(g_Yytk->ExecuteCodeObject(self, self, (CCode*)code, *result, 0)); return 0; }
+	__except (EXCEPTION_EXECUTE_HANDLER) { return GetExceptionCode(); }
+#else
 	__try { *ret = fn(self, self, code, result, 0); return 0; }
 	__except (EXCEPTION_EXECUTE_HANDLER) { return GetExceptionCode(); }
+#endif
 }
 
 // Wraps `words` in a hand-built VMBuffer + CCode and runs it through Code_Execute.
@@ -87,6 +94,9 @@ static void RunProbe()
 	AurieStatus s = h ? Internal::MdpLookupModuleByPath(path, yytk) : AURIE_OBJECT_NOT_FOUND;
 	auto exec = yytk ? (PFN_CodeExecute)MmGetHookTrampoline(yytk, "ExecuteIt") : nullptr;
 	Log("YYToolkit module %s, Code_Execute trampoline %p", AurieStatusToString(s), (void*)exec);
+#ifdef YYTK_HAS_EXECUTE_CODE_OBJECT
+	Log("using YYTKInterface::ExecuteCodeObject; IsYYCRunner() = %d", g_Yytk->IsYYCRunner());
+#endif
 	if (!exec)
 		return;
 

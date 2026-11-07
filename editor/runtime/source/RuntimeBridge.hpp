@@ -7,10 +7,13 @@
 #include <string>
 namespace RunnerEditor {
 constexpr size_t MaxMessageBytes = 4096;
+// From the GML built-in code_is_compiled(): YYC runners run native code, VM runners bytecode.
+enum class RunnerType : uint8_t { Unknown, VM, YYC };
 struct Snapshot {
     char room[513]{};
     bool hasRoom = false;
     bool inspectVariables = false; // Advertise only after independent inspector starts.
+    RunnerType runnerType = RunnerType::Unknown;
     uint64_t events = 0, sampledAt = 0, sampledTick = 0;
 };
 uint64_t EpochMilliseconds();

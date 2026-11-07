@@ -11,6 +11,9 @@ function validate(value, pid) {
   if (!value.capabilities || value.capabilities.inspect !== true || value.capabilities.liveCode !== false || value.capabilities.liveAssets !== false) {
     throw new Error('Invalid runtime snapshot capabilities');
   }
+  if (value.runnerType !== undefined && !['vm', 'yyc', 'unknown'].includes(value.runnerType)) {
+    throw new Error('Invalid runtime snapshot runnerType');
+  }
   if (!integer(value.ageMs) || value.ageMs > MAX_AGE_MS) throw new Error('Runtime snapshot is stale or missing monotonic age');
   if (value.sampledAt !== undefined && (!integer(value.sampledAt) || value.sampledAt === 0 || Date.now() - value.sampledAt > MAX_AGE_MS || value.sampledAt - Date.now() > 1000)) {
     throw new Error('Runtime snapshot timestamp is missing, stale, or in the future');

@@ -30,6 +30,7 @@ test('rejects invalid schema, PID mismatch, stale or malformed telemetry (SYNTHE
     ['unsafe capability', sample({ capabilities: { inspect: true, liveCode: true, liveAssets: false } })],
     ['wrong room', sample({ room: {} })],
     ['invalid events', sample({ events: -1 })],
+    ['unknown runner type', sample({ runnerType: 'interpreter' })],
     ['stale monotonic age', sample({ ageMs: 5000 })],
     ['missing age', sample({ ageMs: undefined })],
     ['stale wall timestamp', sample({ sampledAt: Date.now() - 60000 })],

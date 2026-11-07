@@ -265,7 +265,7 @@ function disconnect(reason='Disconnected') {
 function renderSnapshot(sample) {
   runtimeExplorer.snapshot(sample);
   const details=$('#runtime-details'); details.replaceChildren();
-  const fields=[['Process',sample.pid],['Room',sample.room],['Runner',sample.runnerType || 'Unknown'],['Events',sample.events],['Sample age',`${sample.ageMs ?? '?'} ms`],['Mode','Read-only inspection']];
+  const fields=[['Process',sample.pid],['Room',sample.room],['Runner',({vm:'VM (bytecode)',yyc:'YYC (compiled)'})[sample.runnerType] || 'Unknown'],['Events',sample.events],['Sample age',`${sample.ageMs ?? '?'} ms`],['Mode','Read-only inspection']];
   properties(details,fields);
   details.append(element('p','Live code and asset replacement are not implemented in this bridge.','muted'));
   $('#runtime-status').textContent='Connected';

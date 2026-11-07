@@ -31,9 +31,20 @@ static std::atomic<uint64_t> g_Events{0};
 static thread_local bool g_InCallback = false;
 static uint64_t g_LastSample = 0; // accessed only by the established game callback thread
 
+// Queried once, on the first sample: the runner type cannot change during a process.
+static RunnerType g_RunnerType = RunnerType::Unknown;
+static bool g_RunnerTypeQueried = false;
+
 static void Sample() {
     Snapshot sample{};
     sample.inspectVariables = g_InspectorStarted;
+    if (!g_RunnerTypeQueried) {
+        g_RunnerTypeQueried = true;
+        RValue compiled;
+        if (AurieSuccess(g_Yytk->CallBuiltinEx(compiled, "code_is_compiled", nullptr, nullptr, {})))
+            g_RunnerType = compiled.ToBoolean() ? RunnerType::YYC : RunnerType::VM;
+    }
+    sample.runnerType = g_RunnerType;
     sample.events = g_Events.load(std::memory_order_relaxed);
     RValue room, name;
     if (AurieSuccess(g_Yytk->GetBuiltin("room", nullptr, NULL_INDEX, room)) &&

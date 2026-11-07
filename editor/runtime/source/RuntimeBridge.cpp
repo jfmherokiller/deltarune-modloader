@@ -106,7 +106,8 @@ static std::string Encode(const Snapshot& value) {
         ",\"events\":" + std::to_string(value.events) +
         ",\"sampledAt\":" + std::to_string(value.sampledAt) +
         ",\"ageMs\":" + std::to_string(age) +
-        ",\"runnerType\":\"unknown\",\"capabilities\":{\"inspect\":true,\"liveCode\":false,\"liveAssets\":false" +
+        ",\"runnerType\":\"" + std::string(value.runnerType == RunnerType::VM ? "vm" :
+            value.runnerType == RunnerType::YYC ? "yyc" : "unknown") + "\",\"capabilities\":{\"inspect\":true,\"liveCode\":false,\"liveAssets\":false" +
         (value.inspectVariables ? ",\"inspectVariables\":true" : "") + "}}\n";
     return json.size() <= MaxMessageBytes ? json : std::string{};
 }

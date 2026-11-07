@@ -42,6 +42,23 @@ int main(int argc, char** argv) {
   assert(json.find("\"chapter\"") == std::string::npos);
   assert(json.find("\"ageMs\":") != std::string::npos);
   assert(json.find("\"runnerType\":\"unknown\"") != std::string::npos);
+  CloseHandle(client);
+  assert(bridge.Stop());
+  for (auto [type, text] : {std::pair{RunnerType::VM, "vm"}, std::pair{RunnerType::YYC, "yyc"}}) {
+    assert(bridge.Start());
+    value.runnerType = type; bridge.Publish(value);
+    client = CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+    assert(client != INVALID_HANDLE_VALUE);
+    assert(ReadFile(client, bytes, sizeof(bytes) - 1, &read, nullptr));
+    assert(std::string(bytes, read).find(std::string("\"runnerType\":\"") + text + "\"") != std::string::npos);
+    CloseHandle(client);
+    assert(bridge.Stop());
+  }
+  value.runnerType = RunnerType::Unknown;
+  assert(bridge.Start());
+  client = CreateFileW(name.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, 0, nullptr);
+  assert(client != INVALID_HANDLE_VALUE);
+  assert(ReadFile(client, bytes, sizeof(bytes) - 1, &read, nullptr));
   assert(json.back() == '\n');
   CloseHandle(client);
   assert(bridge.Stop());
