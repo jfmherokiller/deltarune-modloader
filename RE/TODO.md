@@ -72,6 +72,28 @@
 - See `../editor/ARCHITECTURE.md` for shared-core and game-adapter boundaries.
 
 
+## YYC "IL2CPP-style" toolchain (2026-11-06/07)
+
+Overview and evidence: `../docs/yyc_il2cpp.md`. Test game: Dwarf Eats Mountain 1.1.0 under Wine.
+
+- [x] Static dumper `../tools/yyc_dump.py`: `YYGMLFuncs` table (5917 scripts/events, all
+  5851 with `.pdata` confirmed by their own stack-trace name), YYVAR records, callees, per-object
+  variable use; `ida_names.py` names + prototypes verified in IDA 9.1 headless.
+- [x] `../modloader/yyc_runtime_dump` (YYCRuntimeDump.dll): 5690 scripts (all match the static
+  table), 2864 built-ins, 210 built-in variables, 100 runner-interface slots, YYVAR runtime ids;
+  merged by `yyc_dump.py --runtime`.
+- [x] `../modloader/yyc_interop` header + YYCHookDemo: name-resolved calls and inline detours on
+  scripts and events; detour on `loc` changes the text drawn on screen.
+- [x] `../modloader/yyc_vm_probe`: the YYC runner executes hand-built bytecode through its own
+  Code_Execute/VM::Exec (constants, built-in calls, global read/write, `script_execute`).
+- [x] `yytk_probe` fixed for Wine (static `RValue` constructed during CRT init blocked mapping).
+- [ ] Runtime linking of compiled GML (operands → runtime ids, strings) shared with the VM-game
+  runtime compiler; then loose GML mods on YYC.
+- [ ] A public "execute CCode" call in the YYToolkit fork, instead of borrowing its ExecuteIt
+  trampoline (upstreaming stays the owner's call).
+- [ ] Repeat on a second YYC game / runner version.
+
+
 ## DialogueBacklog mod (2026-11-06)
 
 - [x] `mods_examples/DialogueBacklog`: T-key backlog (key in `dialogue_backlog.ini`; F8 and F6 clash with Steam Remote Play; T is only read by unused dev objects in Ch1-5) of every `obj_writer` page with speaker names

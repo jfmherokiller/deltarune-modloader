@@ -10,3 +10,7 @@ Set `YYTK_PROBE_GLOBAL=<name>` to also read a specific global.
 Build: `build.bat` (compiles against the `external/YYToolkit` submodule headers).
 
 DELTARUNE Ch2, YYToolkit fork `deltarune` branch: 18 passed, 0 failed (2026-09-28).
+
+Dwarf Eats Mountain 1.1.0 (YYC), under Wine with the current loader: 19 passed, 0 failed
+(2026-11-07), after moving the shared `RValue` out of static storage: its constructor ran
+during CRT init, which Aurie cannot support under Wine, so the DLL was not mapped.

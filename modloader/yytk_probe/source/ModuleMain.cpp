@@ -6,6 +6,7 @@
 #include <windows.h>
 #include <atomic>
 #include <cstdio>
+#include <optional>
 #include <string>
 #include <vector>
 using namespace Aurie;
@@ -97,26 +98,30 @@ static bool T_GetGlobalMember(void* ctx, std::string* d)
 	*d = std::string(name) + ": " + AurieStatusToString(s) + (v ? " = " + v->ToString() : "");
 	return AurieSuccess(s) && v;
 }
-static RValue g_Inst;          // instance_find result, shared by the steps below
+// instance_find result, shared by the steps below. Not a plain static RValue: its constructor
+// calls into YYTK during CRT init, which fails under Wine (no ntdll!LdrpCallInitRoutine).
+static std::optional<RValue> g_Inst;
 static CInstance* g_InstPtr = nullptr;
 static bool T_InstFind(void*, std::string* d)
 {
 	RValue cnt; g_Yytk->GetBuiltin("instance_count", nullptr, NULL_INDEX, cnt);
 	g_Inst = g_Yytk->CallBuiltin("instance_find", { RValue(-3), RValue(0) });   // all, first
 	*d = "instance_count kind=" + cnt.GetKindName() + " value=" + cnt.ToString() +
-		" | instance_find kind=" + g_Inst.GetKindName() + " raw m_Kind=" + std::to_string((int)g_Inst.m_Kind) +
-		" i64=" + std::to_string(g_Inst.m_i64);
+		" | instance_find kind=" + g_Inst->GetKindName() + " raw m_Kind=" + std::to_string((int)g_Inst->m_Kind) +
+		" i64=" + std::to_string(g_Inst->m_i64);
 	return true;
 }
 static bool T_InstToInt(void*, std::string* d)
 {
-	int32_t id = g_Inst.ToInt32();
+	if (!g_Inst) { *d = "instance_find did not run"; return false; }
+	int32_t id = g_Inst->ToInt32();
 	*d = "id=" + std::to_string(id);
 	return id > 0;
 }
 static bool T_InstObject(void*, std::string* d)
 {
-	int32_t id = static_cast<int32_t>(g_Inst.m_i64 & 0xFFFFFFFF);
+	if (!g_Inst) { *d = "instance_find did not run"; return false; }
+	int32_t id = static_cast<int32_t>(g_Inst->m_i64 & 0xFFFFFFFF);
 	AurieStatus s = g_Yytk->GetInstanceObject(id, g_InstPtr);
 	char b[96]; snprintf(b, sizeof(b), "GetInstanceObject(%d) %s ptr=%p", id, AurieStatusToString(s), (void*)g_InstPtr);
 	*d = b;

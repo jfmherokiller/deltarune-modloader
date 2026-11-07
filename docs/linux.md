@@ -33,6 +33,9 @@ modloader/yytk_plugin/build.sh     # DeltaruneYYTK.dll
 modloader/yytk_probe/build.sh      # YYTKProbe.dll
 tools/build_yytoolkit.sh out/yytk  # YYToolkit.dll from the submodule
 editor/runtime/build.sh [test]     # RunnerEditor.dll; `test` runs the native tests under wine
+modloader/yyc_runtime_dump/build.sh  # YYCRuntimeDump.dll  (YYC toolchain, docs/yyc_il2cpp.md)
+modloader/yyc_interop/build.sh       # YYCHookDemo.dll, example mod for yyc_interop.hpp
+modloader/yyc_vm_probe/build.sh      # YYCVmProbe.dll, bytecode-on-YYC experiment
 ```
 
 `MSVC_SYSROOT` overrides the sysroot location. Exports and imports match the MSVC builds.
