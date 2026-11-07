@@ -335,7 +335,12 @@ static void* CompileLooseGml(const char* path_utf8, unsigned int* out_size)
         Log("loose GML: %d mod folder(s) for this data.win but compiler missing (%s) - running vanilla", mods, c);
         return NULL;
     }
-    Log("loose GML: compiling %s into %s", dirs_u, path_utf8);
+    {
+        char c[MAX_PATH * 6];
+        const WCHAR* name = wcsrchr(g_UtmtCli, L'\\');
+        W2U(name ? name + 1 : g_UtmtCli, c, sizeof c);
+        Log("loose GML: compiling %s into %s (%s)", dirs_u, path_utf8, c);
+    }
 
     WCHAR pipe_name[128];
     _snwprintf(pipe_name, 128, L"\\\\.\\pipe\\dr_modloader_%lu_%lu", GetCurrentProcessId(), GetTickCount());
@@ -545,6 +550,49 @@ static int LoadNativeMods(int dry_run)
 typedef int (*PFN_Entry)(void* peb);
 static PFN_Entry g_OrigEntry;
 static HANDLE    g_MainThread;
+static volatile DWORD g_MainTid;
+
+/* Wine only: AurieCore decides whether the process is still in early launch (and so loads
+ * ModuleEntrypoint / ModulePreinitialize plugins such as YYToolkit) from
+ * NtQueryInformationThread class 40 (ThreadSystemThreadInformation) on the entry-point
+ * thread, falling back to SystemProcessInformation. Wine implements neither: class 40 is
+ * STATUS_NOT_IMPLEMENTED and every thread reports ThreadState 0 / WaitReason 0. Aurie then
+ * silently skips its early phase, maps YYToolkit late and YYToolkit crashes in its
+ * ModuleOperationCallback (calls through a still-null Aurie API pointer). Answer class 40 for
+ * the self-suspended main thread the way Windows does (Waiting / Suspended); everything else
+ * goes to Wine unchanged. */
+typedef struct {
+    LARGE_INTEGER KernelTime, UserTime, CreateTime;
+    ULONG WaitTime;
+    PVOID StartAddress;
+    struct { HANDLE UniqueProcess, UniqueThread; } ClientId;
+    LONG Priority, BasePriority;
+    ULONG ContextSwitches, ThreadState, WaitReason;
+} SysThreadInfo;
+typedef LONG (NTAPI* PFN_NtQueryInformationThread)(HANDLE, ULONG, PVOID, ULONG, PULONG);
+static PFN_NtQueryInformationThread g_OrigNtQueryInformationThread;
+static LONG NTAPI HookedNtQueryInformationThread(HANDLE thread, ULONG cls, PVOID info, ULONG len, PULONG ret_len)
+{
+    enum { ThreadSystemThreadInformation = 40, StateWaiting = 5, WaitSuspended = 5 };
+    if (cls == ThreadSystemThreadInformation && g_MainTid && info && len >= sizeof(SysThreadInfo) &&
+        GetThreadId(thread) == g_MainTid) {
+        DWORD prev = SuspendThread(thread);         /* live suspend count, as the helper does */
+        if (prev != (DWORD)-1) {
+            ResumeThread(thread);
+            if (prev >= 1) {
+                SysThreadInfo* t = (SysThreadInfo*)info;
+                memset(t, 0, sizeof *t);
+                t->ClientId.UniqueProcess = (HANDLE)(ULONG_PTR)GetCurrentProcessId();
+                t->ClientId.UniqueThread = (HANDLE)(ULONG_PTR)g_MainTid;
+                t->ThreadState = StateWaiting;
+                t->WaitReason = WaitSuspended;
+                if (ret_len) *ret_len = sizeof *t;
+                return 0;   /* STATUS_SUCCESS */
+            }
+        }
+    }
+    return g_OrigNtQueryInformationThread(thread, cls, info, len, ret_len);
+}
 
 static DWORD WINAPI AurieHelperThread(LPVOID param)
 {
@@ -601,6 +649,7 @@ static int EntryDetour(void* peb)
 {
     DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(), &g_MainThread,
                     THREAD_SUSPEND_RESUME | THREAD_QUERY_INFORMATION, FALSE, 0);
+    g_MainTid = GetCurrentThreadId();
     HANDLE t = CreateThread(NULL, 0, AurieHelperThread, (LPVOID)(ULONG_PTR)g_AurieTimeoutMs, 0, NULL);
     if (t) {
         CloseHandle(t);
@@ -670,12 +719,18 @@ static void Init(void)
 
     ScanMods();
 
-    /* loose GML compiler: mods\tools\utmt\UndertaleModCli.exe by default */
+    /* loose GML compiler: utmt_cli in modloader.ini, else our mods\tools\compiler\LooseModCompiler.exe
+     * (ImportLooseMod compiled in; same command line and pipe protocol), else UTMT's CLI with the
+     * ImportLooseMod.csx script. */
     {
         WCHAR v[MAX_PATH * 2];
         GetPrivateProfileStringW(L"loader", L"utmt_cli", L"", v, MAX_PATH * 2, ini);
         if (v[0]) wcscpy(g_UtmtCli, v);
-        else _snwprintf(g_UtmtCli, MAX_PATH * 2, L"%s\\tools\\utmt\\UndertaleModCli.exe", g_ModsDir);
+        else {
+            _snwprintf(g_UtmtCli, MAX_PATH * 2, L"%s\\tools\\compiler\\LooseModCompiler.exe", g_ModsDir);
+            if (GetFileAttributesW(g_UtmtCli) == INVALID_FILE_ATTRIBUTES)
+                _snwprintf(g_UtmtCli, MAX_PATH * 2, L"%s\\tools\\utmt\\UndertaleModCli.exe", g_ModsDir);
+        }
         _snwprintf(g_ImportScript, MAX_PATH * 2, L"%s\\tools\\ImportLooseMod.csx", g_ModsDir);
         if (GetFileAttributesW(g_ImportScript) == INVALID_FILE_ATTRIBUTES)   /* older installs */
             _snwprintf(g_ImportScript, MAX_PATH * 2, L"%s\\tools\\ImportGMLFolder.csx", g_ModsDir);
@@ -698,7 +753,8 @@ static void Init(void)
     }
 
     HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
-    if (ntdll && GetProcAddress(ntdll, "wine_get_version")) {
+    int wine = ntdll && GetProcAddress(ntdll, "wine_get_version");
+    if (wine) {
         void* cpw = (void*)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "CreateProcessW");
         Log("running under Wine - enabling chapter relaunch fix");
         Hook("CreateProcessW", cpw, (void*)HookedCreateProcessW, (void**)&g_OrigCreateProcessW);
@@ -712,6 +768,11 @@ static void Init(void)
         IMAGE_NT_HEADERS* nt = (IMAGE_NT_HEADERS*)(base + ((IMAGE_DOS_HEADER*)base)->e_lfanew);
         void* oep = base + nt->OptionalHeader.AddressOfEntryPoint;
         Hook("entry point (Aurie early launch)", oep, (void*)EntryDetour, (void**)&g_OrigEntry);
+        if (wine) {
+            void* qit = (void*)GetProcAddress(ntdll, "NtQueryInformationThread");
+            if (qit) Hook("NtQueryInformationThread (Wine: Aurie early-launch detection)", qit,
+                          (void*)HookedNtQueryInformationThread, (void**)&g_OrigNtQueryInformationThread);
+        }
         if (!GetPrivateProfileIntW(L"loader", L"aurie_console", 0, ini)) {
             void* ac = (void*)GetProcAddress(GetModuleHandleW(L"kernel32.dll"), "AllocConsole");
             if (ac) Hook("AllocConsole (hide Aurie console)", ac, (void*)HookedAllocConsole, (void**)&g_OrigAllocConsole);

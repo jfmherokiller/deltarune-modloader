@@ -1,10 +1,12 @@
 // SYNTHETIC native transport/lifecycle tests. Never load or contact a game.
+#include <winsock2.h>
 #include <Windows.h>
 #include <cassert>
 #include <cstdio>
 #include <string>
 #include <thread>
 #include "../source/RuntimeBridge.hpp"
+#include "../source/TcpRelay.hpp"
 int main(int argc, char** argv) {
   using namespace RunnerEditor;
   RuntimeBridge bridge;
@@ -17,9 +19,14 @@ int main(int argc, char** argv) {
   value.sampledTick = GetTickCount64();
   bridge.Publish(value);
   if (argc == 2 && strcmp(argv[1], "--serve-synthetic") == 0) {
-    puts("SYNTHETIC_READY - test data, NOT a game"); fflush(stdout);
+    // Under Wine the Linux-side Node client reaches the pipe through the relay;
+    // print the Windows PID because the harness only knows the Unix one.
+    TcpRelay relay;
+    const bool relayed = RunningUnderWine() && relay.Start();
+    printf("SYNTHETIC_READY pid=%lu relay=%d - test data, NOT a game\n", GetCurrentProcessId(), relayed ? 1 : 0); fflush(stdout);
     char command[16]{};
     fgets(command, sizeof(command), stdin); // test harness stdin ONLY; never part of pipe protocol
+    if (relayed) assert(relay.Stop());
     assert(bridge.Stop());
     return 0;
   }

@@ -2,23 +2,12 @@
 // SYNTHETIC pipe fixtures; these tests never open a game.
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const net = require('node:net');
+const { serve } = require('./transport-fixture.cjs');
 const runtime = require('../lib/runtime.cjs');
-const pipe = `\\\\.\\pipe\\RunnerInspector-${process.pid}`;
 const page = (overrides = {}) => ({ protocol:2, pid:process.pid, kind:'globals', target:null,
   offset:0, items:[{name:'counter',type:'int64',value:'9223372036854775807',source:'dynamic',readOnly:true}],
   hasMore:false, sampledAt:Date.now(), ageMs:0, room:'SYNTHETIC_INSPECTOR_ROOM', error:null, ...overrides });
-async function fixture(handler, body) {
-  const sockets = new Set();
-  const server = net.createServer(socket => {
-    sockets.add(socket); socket.on('error', () => {});
-    socket.on('close', () => sockets.delete(socket));
-    handler(socket);
-  });
-  await new Promise((resolve,reject) => server.once('error',reject).listen(pipe,resolve));
-  try { await body(); }
-  finally { for (const socket of sockets) socket.destroy(); await new Promise(resolve => server.close(resolve)); }
-}
+const fixture = (handler, body) => serve('inspect', process.pid, handler, body);
 test('inspector requests a globals page and preserves int64 display strings (SYNTHETIC)', async () => {
   assert.equal(typeof runtime.inspect, 'function', 'read-only inspector client is missing');
   let request;

@@ -20,6 +20,9 @@ function current() {
 }
 async function open(root) {
   const { Workspace } = require('./lib/workspace.cjs');
+  // Linux installs routinely reach the game through symlinks (~/.steam/steam, library
+  // mounts). Resolve the folder the user picked once; links inside it stay rejected.
+  if (process.platform !== 'win32') root = await require('node:fs/promises').realpath(root);
   const candidate = new Workspace(root);
   const index = await candidate.index();
   workspace = candidate;

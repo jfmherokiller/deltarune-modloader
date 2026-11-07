@@ -11,9 +11,12 @@ both with UndertaleModCli, and writes only the code entries that differ to
 deleted afterwards; nothing in the game folder except mods/<mod_name> is touched.
 Also reports non-code differences (asset counts) that loose GML cannot carry.
 
-Needs: <game_dir>/mods/tools/utmt/UndertaleModCli.exe and xdelta3 on PATH or XDELTA3 env.
+Needs: UndertaleModCli (see utmt_cli.py: <game_dir>/mods/tools/utmt/UndertaleModCli.exe, or on Linux
+the native utmtcli / wine) and xdelta3 on PATH or XDELTA3 env.
 """
 import os, re, shutil, subprocess, sys, tempfile, glob
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import utmt_cli
 
 def run(cmd):
     r = subprocess.run(cmd, stdin=subprocess.DEVNULL, capture_output=True, text=True, errors="replace")
@@ -26,14 +29,14 @@ def load_gml(d):
             for p in glob.glob(os.path.join(d, "**", "*.gml"), recursive=True)}
 
 def info(cli, win):
-    out = run([cli, "info", win])
+    out = run(cli.cmd("info", cli.path(win)))
     return dict((k.strip(), int(v)) for v, k in re.findall(r"(\d+) ([A-Za-z][A-Za-z ]+?)(?=,|\r?\n)", out))
 
 def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
     game, mod = sys.argv[1], sys.argv[2]
-    cli = os.path.join(game, "mods", "tools", "utmt", "UndertaleModCli.exe")
+    cli = utmt_cli.find(game)
     xd = os.environ.get("XDELTA3", "xdelta3")
     for spec in sys.argv[3:]:
         chap, patch = spec.split("=", 1)
@@ -41,8 +44,8 @@ def main():
         with tempfile.TemporaryDirectory() as tmp:
             patched = os.path.join(tmp, "patched.win")
             run([xd, "-d", "-f", "-s", vanilla, patch, patched])
-            run([cli, "dump", vanilla, "-o", os.path.join(tmp, "van"), "-c", "UMT_DUMP_ALL"])
-            run([cli, "dump", patched, "-o", os.path.join(tmp, "mod"), "-c", "UMT_DUMP_ALL"])
+            run(cli.cmd("dump", cli.path(vanilla), "-o", cli.path(os.path.join(tmp, "van")), "-c", "UMT_DUMP_ALL"))
+            run(cli.cmd("dump", cli.path(patched), "-o", cli.path(os.path.join(tmp, "mod")), "-c", "UMT_DUMP_ALL"))
             van, new = load_gml(os.path.join(tmp, "van")), load_gml(os.path.join(tmp, "mod"))
             changed = sorted(k for k in new if van.get(k) != new[k])
             removed = sorted(set(van) - set(new))

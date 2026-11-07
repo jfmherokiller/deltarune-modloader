@@ -8,7 +8,8 @@ const { createHash } = require('node:crypto');
 const { Workspace } = require('../lib/workspace.cjs');
 
 async function fixture(t, files = {}) {
-  const root = await fs.mkdtemp(path.join(process.env.TMPDIR || os.tmpdir(), 'mod-workspace-'));
+  // Canonical base: the temp dir itself may sit under a symlink (common on Linux homes).
+  const root = await fs.mkdtemp(path.join(await fs.realpath(process.env.TMPDIR || os.tmpdir()), 'mod-workspace-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   for (const [relative, content] of Object.entries(files)) {
     await fs.mkdir(path.dirname(path.join(root, relative)), { recursive: true });

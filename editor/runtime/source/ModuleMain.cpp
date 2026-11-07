@@ -1,8 +1,10 @@
 // RunnerEditor: generic, read-only YYToolkit v5 runtime telemetry.
 // No game-specific objects/globals, patches, eval, asset replacement, or UI hooks.
 // RunnerCE-<pid> adds RValue/CInstance addresses for the Cheat Engine dissector; CE does any writing.
+#include <winsock2.h> // before any Windows.h (TcpRelay)
 #include <YYToolkit/YYTK_Shared.hpp>
 #include "RuntimeBridge.hpp"
+#include "TcpRelay.hpp"
 #include "InspectorBridge.hpp"
 #include "InspectorSampler.hpp"
 #include <atomic>
@@ -17,6 +19,7 @@ static YYTKInterface* g_Yytk = nullptr;
 static RuntimeBridge* g_Bridge = nullptr;
 static InspectorBridge* g_Inspector = nullptr;
 static InspectorBridge* g_CheatEngine = nullptr; // RunnerCE-<pid>: same sampler, RValue addresses for CE
+static TcpRelay* g_Relay = nullptr; // Wine/Proton only: loopback relay for native Linux editors
 static bool g_InspectorStarted = false; // fixed before callback registration
 static bool g_CheatEngineStarted = false;
 static bool g_InspectorFault = false; // established game-thread only
@@ -125,8 +128,24 @@ EXPORTED AurieStatus ModuleInitialize(IN AurieModule* Module, IN const fs::path&
     catch (...) { g_InspectorStarted = false; }
     try { g_CheatEngine = new InspectorBridge(true); g_CheatEngineStarted = g_CheatEngine->Start(); }
     catch (...) { g_CheatEngineStarted = false; }
+    // Optional, Wine only (RUNNER_EDITOR_RELAY=0 disables): failure leaves the pipes untouched.
+    char relayFlag[4]{};
+    GetEnvironmentVariableA("RUNNER_EDITOR_RELAY", relayFlag, sizeof(relayFlag));
+    if (RunningUnderWine() && strcmp(relayFlag, "0") != 0) {
+        try {
+            g_Relay = new TcpRelay;
+            if (g_Relay->Start())
+                DbgPrintEx(LOG_SEVERITY_INFO, "[RunnerEditor] Wine relay on 127.0.0.1:%u, registry %S",
+                    static_cast<unsigned>(g_Relay->Port()), g_Relay->RegistryFile().c_str());
+            else {
+                DbgPrintEx(LOG_SEVERITY_WARNING, "[RunnerEditor] Wine relay not started: %s", g_Relay->Failure());
+                delete g_Relay; g_Relay = nullptr;
+            }
+        }
+        catch (...) { g_Relay = nullptr; }
+    }
     const auto status = g_Yytk->CreateCallback(Module, EVENT_OBJECT_CALL, CodeCallback, 0);
-    if (!AurieSuccess(status)) { if (g_CheatEngine) g_CheatEngine->Stop(); if (g_Inspector) g_Inspector->Stop(); g_Bridge->Stop(); return status; }
+    if (!AurieSuccess(status)) { if (g_Relay) g_Relay->Stop(); if (g_CheatEngine) g_CheatEngine->Stop(); if (g_Inspector) g_Inspector->Stop(); g_Bridge->Stop(); return status; }
     g_Stopping.store(false, std::memory_order_release);
     return AURIE_SUCCESS;
 }
@@ -138,6 +157,7 @@ EXPORTED AurieStatus ModuleUnload(IN AurieModule* Module, IN const fs::path& Mod
     // before ModuleUnload. Do NOT mutate its unprotected callback vector ourselves.
     // A parked/in-flight game callback cannot be forcibly joined: retain the pinned
     // code and cache instead. Worker Stop is independently bounded and cancellable.
+    if (g_Relay) g_Relay->Stop(); // pipe client: stop before the pipe servers
     if (g_CheatEngine) g_CheatEngine->Stop();
     if (g_Inspector) g_Inspector->Stop();
     if (g_Bridge) g_Bridge->Stop();

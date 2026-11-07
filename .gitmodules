@@ -2,3 +2,6 @@
 	path = external/YYToolkit
 	url = https://github.com/jfmherokiller/YYToolkit.git
 	branch = deltarune
+[submodule "external/UndertaleModTool"]
+	path = external/UndertaleModTool
+	url = https://github.com/UnderminersTeam/UndertaleModTool.git

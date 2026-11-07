@@ -58,6 +58,26 @@ for (var i = 0; i < array_length(lays); i++)
     }
 }
 
+// interactables: everything the player's interact check can hit (children of obj_interactable /
+// obj_interactablesolid), including invisible trigger zones in dark rooms. Drawn as boxes.
+var boxes = [];
+var parents = ["obj_interactable", "obj_interactablesolid"];
+for (var p = 0; p < array_length(parents); p++)
+{
+    var par = asset_get_index(parents[p]);
+    if (par < 0)
+        continue;
+    with (par)
+    {
+        if (bbox_right < vx || bbox_left > vx + vw || bbox_bottom < vy || bbox_top > vy + vh)
+            continue;
+        var tag = object_get_name(object_index);
+        if (variable_instance_exists(id, "extflag") && is_string(extflag) && extflag != "")
+            tag += " \"" + extflag + "\"";
+        array_push(boxes, [(bbox_left - vx) * sx, (bbox_top - vy) * sy, (bbox_right - vx) * sx, (bbox_bottom - vy) * sy, tag]);
+    }
+}
+
 // sorted unique list for the side panel / clipboard
 var keys = ds_map_keys_to_array(seen);
 ds_map_destroy(seen);
@@ -84,6 +104,21 @@ for (var k = 0; k < array_length(labels) && k < 80; k++)
     draw_text_transformed(tx, ty + 1, L[2], s, s, 0);
     draw_set_color(c_yellow);
     draw_text_transformed(tx, ty, L[2], s, s, 0);
+}
+
+// interactable boxes (magenta), labelled at the bottom edge so they don't cover sprite names
+for (var b = 0; b < array_length(boxes) && b < 60; b++)
+{
+    var B = boxes[b];
+    draw_set_color(c_fuchsia);
+    draw_rectangle(B[0], B[1], B[2], B[3], true);
+    draw_rectangle(B[0] + 1, B[1] + 1, B[2] - 1, B[3] - 1, true);
+    var bx = clamp(B[0], 2, gw - 200);
+    var by = clamp(B[3] + 1, 2, gh - 12);
+    draw_set_color(c_black);
+    draw_text_transformed(bx + 1, by + 1, B[4], s, s, 0);
+    draw_set_color(c_fuchsia);
+    draw_text_transformed(bx, by, B[4], s, s, 0);
 }
 
 // panel

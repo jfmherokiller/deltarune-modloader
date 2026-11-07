@@ -7,13 +7,16 @@ Ported from the Wine-only prototype `mod_test/aurie_build/proxy/dllmain.c` (the 
 
 ```
 build.bat          → build\version.dll   (MSVC 2022, /MT, only imports KERNEL32)
+build.sh           → build/version.dll   (Linux: clang-cl + lld-link, same flags; see docs/linux.md)
 ```
 
 ## Install / uninstall
 
 Copy `build\version.dll` next to `DELTARUNE.exe` and create a `mods\` folder.
 Without `mods\` the DLL loads but does nothing. Uninstall = delete `version.dll`.
-Wine/Proton additionally needs `WINEDLLOVERRIDES="version=n,b"`.
+Wine/Proton additionally needs `WINEDLLOVERRIDES="version=n,b"` as a Steam launch option, or run
+`python3 tools/proton_setup.py` once (per-exe override in the game's Proton prefix). See
+[`docs/linux.md`](../docs/linux.md).
 
 ## Mods folder
 

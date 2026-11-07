@@ -3,6 +3,9 @@
 Press **F9** in any chapter to label every sprite on screen with its name and frame
 (`spr_krisd_dark [0/4]`), plus a panel listing the room and every unique sprite name.
 Sprites placed directly on room layers (decorations) are labeled too.
+**Interactables** (everything the interact button can hit: children of `obj_interactable` /
+`obj_interactablesolid`, including invisible trigger zones) are drawn as magenta boxes with their
+object name and `extflag`, so dark rooms such as the Chapter 4 egg room become readable.
 **Shift+F9** copies the list to the clipboard.
 
 <img src="../../docs/images/spriteinspector.png" alt="SpriteInspector overlay" width="640">

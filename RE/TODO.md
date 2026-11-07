@@ -1,5 +1,28 @@
 # TODO / Workflow
 
+## Own GML compiler (2026-11-06)
+
+- [x] `compiler/LooseModCompiler`: ImportLooseMod.csx built against the UndertaleModLib submodule (0.9.2.0); loader prefers it over the UTMT CLI. Byte-identical output; ~2x faster under Wine. See `compiler/README.md`.
+- [x] hostfxr in-process hosting (`compiler/RunnerCompiler/native/ClrHost.cpp`), verified via clrhost-test (Linux + Wine).
+- [ ] Live-run the RunnerCompiler spike plugin (installed in mods/aurie), then `compiler/tools/compare_runtime_bytecode.py` to derive the load-time operand fixup.
+- [ ] IGameContext from the live runner; bytecode injection into CCode/VMBuffer. Design: `compiler/RUNTIME_COMPILER.md`.
+
+## Linux support (2026-11-06)
+
+- [x] clang-cl/lld builds of every DLL (`build.sh`, `tools/build_yytoolkit.sh`, sysroot via
+  `tools/msvc_sysroot.py`); exports/imports match the MSVC builds (pefile).
+- [x] Proton: `tools/proton_setup.py` per-exe `version` override. Live: YYToolkit failed under Wine
+  (Aurie early-launch detection uses unimplemented `NtQueryInformationThread` class 40); loader now
+  answers it for the parked thread. Verified via Steam: YYToolkit + plugins load, chapter switch to
+  Ch4/Ch5 OK, loose GML compiled in-Proton by the Windows UTMT CLI.
+- [x] Runner Studio native on Linux via `RunnerEditor.dll` loopback relay; live read from Linux
+  (Ch5 `room_dw_garden_ralseicupboard`: snapshot, globals page, instances). Stale-entry pruning by
+  Unix pid/start time added after the live run; **not yet seen live** (needs a fresh launch).
+- [x] `export_sprites.sh`, `utmt_cli.py` (native utmtcli or wine); gml_to_patches identical both ways.
+- [x] SpriteInspector draws interactable boxes (dark rooms, e.g. Ch4 egg room `room_dw_churchb_man`);
+  user confirmed in-game.
+- [ ] Release CI still Windows-only; Linux build is local.
+
 ## Runtime editor (in progress)
 
 - [x] Game-independent desktop authoring foundation in `../editor/` (working name Runner Studio),
@@ -48,6 +71,18 @@
   Do not reuse DELTARUNE hook offsets or assume UTMT bytecode replacement works on YYC.
 - See `../editor/ARCHITECTURE.md` for shared-core and game-adapter boundaries.
 
+
+## DialogueBacklog mod (2026-11-06)
+
+- [x] `mods_examples/DialogueBacklog`: T-key backlog (key in `dialogue_backlog.ini`; F8 and F6 clash with Steam Remote Play; T is only read by unused dev objects in Ch1-5) of every `obj_writer` page with speaker names
+  (`\F`/`\T` codes, `global.fc`, text sound, nearest enemy for balloons), picked choices, and a
+  per-chapter transcript `dialogue_log_chN.txt` in the save folder, reloaded at launch.
+  Headless import OK in chapters 1-5 together with CheatMenu + SpriteInspector (19 GML, 6 patches,
+  0 failures); patched `obj_writer_Draw_0` / `obj_choicer_neo_Other_10` / `obj_time_Step_1` checked
+  by decompiling the output. Installed in the game's `mods/`.
+- [x] Ch5 live run (v1): transcript written with correct speakers (Susie, Asgore, Flowery); long pages were logged twice (writer re-wrap inserts `||`), fixed in the page key + add() dedupe.
+- [ ] In-game test of the fixed build: open/scroll/close T in overworld and battle,
+  speaker names, choice entry, transcript file location under Proton, reload after relaunch.
 
 Durable notes so work can be picked up later. Two parallel tracks:
 

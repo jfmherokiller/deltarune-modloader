@@ -4,7 +4,7 @@ Tools for modding the Steam release of **DELTARUNE** (GameMaker VM runner, x64, 
 
 | Folder | What |
 |---|---|
-| [`mods_examples/`](mods_examples/) | Example mods: `CheatMenu` (F7 in-game cheat overlay; new object/sprite/sound + patch files), `SpriteInspector` (F9 labels every sprite on screen with its name) |
+| [`mods_examples/`](mods_examples/) | Example mods: `CheatMenu` (F7 in-game cheat overlay; new object/sprite/sound + patch files), `SpriteInspector` (F9 labels every sprite on screen with its name), `DialogueBacklog` (T key: Ace Attorney-style history of every dialogue line, saved per chapter) |
 | [`modloader/`](modloader/README.md) | `version.dll` proxy mod loader. It handles loose-file overrides, **loose `.gml` script replacement** (no xdelta, and `data.win` is never modified), script redirects, and loads Aurie + YYToolkit (patched for DELTARUNE). |
 | [`modloader/yytk_plugin/`](modloader/yytk_plugin) | Example YYToolkit v5 plugin that reads the room and globals live. |
 | [`modloader/yytk_probe/`](modloader/yytk_probe) | `YYTKProbe.dll`: game-independent self-test of the YYToolkit APIs an editor needs (PASS/FAIL to `yytk_probe.log`). |
@@ -45,6 +45,8 @@ To uninstall, delete `version.dll`.
   `MSBuild external\YYToolkit\YYToolkit\YYToolkit.vcxproj -p:Configuration=Release -p:Platform=x64`.
 - **Example plugin:** `modloader\yytk_plugin\build.bat`.
 - **Release zip:** `python tools/package_release.py <version> <out.zip>` (see the script for inputs).
+- **Linux:** `build.sh` next to each `build.bat` (clang-cl + lld) and `tools/build_yytoolkit.sh`.
+  Playing under Proton, the Linux mod tools and the editor: [`docs/linux.md`](docs/linux.md).
 
 Every push to `main` that changes code runs [`.github/workflows/release.yml`](.github/workflows/release.yml):
 it builds all three from source on `windows-2022`, downloads AurieCore v2.0.2 (hash-checked), and

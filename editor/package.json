@@ -5,7 +5,7 @@
   "description": "Loose-mod authoring and runtime inspection for compatible GameMaker games",
   "main": "main.cjs",
   "scripts": {
-    "start": "electron .",
+    "start": "node scripts/electron-path.cjs --run .",
     "test": "node --test tests/*.test.cjs",
     "test:ui": "node --test tests/ui.e2e.cjs"
   },

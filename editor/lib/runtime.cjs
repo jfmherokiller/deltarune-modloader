@@ -21,8 +21,54 @@ const MAX_MESSAGE_BYTES = 4096;
 const TIMEOUT_MS = 1200;
 function validPid(pid) { return Number.isInteger(pid) && pid > 0 && pid <= 0xffffffff; }
 function pipeFor(pid) { return `\\\\.\\pipe\\RunnerEditor-${pid}`; }
+const CHANNEL_PIPES = { snapshot: pipeFor, inspect: pid => `\\\\.\\pipe\\RunnerInspector-${pid}` };
+// Linux/macOS: the game runs under Wine/Proton, whose named pipes are invisible to native
+// processes. RunnerEditor.dll then also listens on 127.0.0.1 and publishes
+// RunnerEditor-<pid>.json {protocol, pid, port, token} in this directory (see runtime/README.md).
+function registryDir() {
+  const os = require('node:os');
+  const path = require('node:path');
+  if (process.env.RUNNER_STUDIO_RUNTIME_DIR) return process.env.RUNNER_STUDIO_RUNTIME_DIR;
+  // Same order as TcpRelay.cpp. Not XDG_RUNTIME_DIR: Proton's container has a private one.
+  if (process.env.XDG_CACHE_HOME) return path.join(process.env.XDG_CACHE_HOME, 'runner-studio');
+  return path.join(os.homedir(), '.cache', 'runner-studio');
+}
+const REGISTRY_NAME = /^RunnerEditor-([1-9][0-9]{0,9})\.json$/;
+async function registryEntry(pid) {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  const file = path.join(registryDir(), `RunnerEditor-${pid}.json`);
+  let value;
+  try {
+    const handle = await fs.open(file, 'r');
+    try {
+      const stat = await handle.stat();
+      if (!stat.isFile() || stat.size > 512) throw new Error('Runtime registry entry is invalid');
+      value = JSON.parse(await handle.readFile('utf8'));
+    } finally { await handle.close(); }
+  } catch (error) {
+    if (error.code === 'ENOENT') throw Object.assign(new Error(`No runtime registered for PID ${pid}`), { code: 'ENOENT' });
+    throw error;
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.protocol !== 1 || value.pid !== pid ||
+      !Number.isInteger(value.port) || value.port < 1 || value.port > 65535 ||
+      typeof value.token !== 'string' || !/^[0-9a-f]{64}$/.test(value.token) ||
+      (value.unixPid !== undefined && (!Number.isInteger(value.unixPid) || value.unixPid < 1)) ||
+      (value.unixStart !== undefined && (typeof value.unixStart !== 'string' || !/^[0-9]{1,20}$/.test(value.unixStart))))
+    throw new Error('Runtime registry entry is invalid');
+  return { file, port: value.port, token: value.token, unixPid: value.unixPid, unixStart: value.unixStart };
+}
+// True/false when the entry names its Unix process (pid + start time), null when it does not.
+async function processAlive(entry) {
+  if (entry.unixPid === undefined || process.platform !== 'linux') return null;
+  try {
+    const stat = await require('node:fs/promises').readFile(`/proc/${entry.unixPid}/stat`, 'utf8');
+    const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+    return entry.unixStart === undefined || fields[19] === entry.unixStart; // field 22 overall
+  } catch { return false; }
+}
 async function snapshot(pid) {
-  return readFrame(pid, pipeFor(pid), MAX_MESSAGE_BYTES, value => validate(value, pid));
+  return readFrame(pid, 'snapshot', MAX_MESSAGE_BYTES, value => validate(value, pid));
 }
 async function inspect(pid, query) {
   if (!query || Array.isArray(query) || typeof query !== 'object' ||
@@ -34,7 +80,7 @@ async function inspect(pid, query) {
   if (query.kind === 'instance' && (!Number.isInteger(query.instanceId) || query.instanceId < 0 || query.instanceId > 2147483647))
     throw new TypeError('Invalid inspector instance ID');
   const command = query.kind === 'instance' ? `instance ${query.instanceId}` : query.kind;
-  return readFrame(pid, `\\\\.\\pipe\\RunnerInspector-${pid}`, 65536,
+  return readFrame(pid, 'inspect', 65536,
     value => validateInspector(value, pid, query.kind, query.instanceId ?? null, offset), `${command} ${offset}\n`);
 }
 function validateInspector(value, pid, kind, target, offset) {
@@ -63,16 +109,24 @@ function validateInspector(value, pid, kind, target, offset) {
   }
   return value;
 }
-async function readFrame(pid, pipe, maxBytes, validateFrame, request) {
+async function readFrame(pid, channel, maxBytes, validateFrame, request) {
   if (!validPid(pid)) throw new TypeError('PID must be an integer between 1 and 4294967295');
-  if (process.platform !== 'win32') throw new Error('Runtime pipes require Windows');
+  const started = performance.now();
+  let target, preamble = '';
+  if (process.platform === 'win32') target = CHANNEL_PIPES[channel](pid);
+  else {
+    const entry = await registryEntry(pid);
+    if (await processAlive(entry) === false) throw new Error(`Runtime for PID ${pid} has exited`);
+    target = { host: '127.0.0.1', port: entry.port };
+    preamble = `RUNNER-RELAY/1 ${entry.token} ${channel}\n`;
+  }
   return new Promise((resolve, reject) => {
-    const started = performance.now();
-    const socket = net.createConnection(pipe);
-    if (request !== undefined) socket.once('connect', () => socket.write(request));
+    const socket = net.createConnection(target);
+    if (preamble || request !== undefined) socket.once('connect', () => socket.write(preamble + (request ?? '')));
     let data = Buffer.alloc(0);
     let settled = false;
-    const timer = setTimeout(() => finish(new Error('Runtime snapshot timed out')), TIMEOUT_MS);
+    const timer = setTimeout(() => finish(new Error('Runtime snapshot timed out')),
+      Math.max(0, TIMEOUT_MS - (performance.now() - started)));
     function finish(error, value) {
       if (settled) return;
       settled = true;
@@ -98,8 +152,37 @@ async function readFrame(pid, pipe, maxBytes, validateFrame, request) {
     });
   });
 }
+// Registry entries outlive a crashed game. Drop those whose port no longer accepts.
+function listening(port) {
+  return new Promise(resolve => {
+    const socket = net.createConnection({ host: '127.0.0.1', port });
+    const done = alive => { socket.destroy(); resolve(alive); };
+    socket.setTimeout(300, () => done(true)); // busy, not dead
+    socket.once('connect', () => done(true));
+    socket.once('error', error => done(error.code !== 'ECONNREFUSED'));
+  });
+}
+async function discoverRegistry() {
+  const fs = require('node:fs/promises');
+  const path = require('node:path');
+  let names;
+  try { names = await fs.readdir(registryDir()); }
+  catch (error) { if (error.code === 'ENOENT') return []; throw error; }
+  const pids = [...new Set(names.map(name => REGISTRY_NAME.exec(name)).filter(Boolean)
+    .map(match => Number(match[1])).filter(validPid))].sort((a, b) => a - b).slice(0, 256);
+  const found = [];
+  for (const pid of pids) {
+    let entry;
+    try { entry = await registryEntry(pid); } catch { continue; }
+    const alive = await processAlive(entry);
+    if (alive === false) { await fs.rm(path.join(registryDir(), `RunnerEditor-${pid}.json`), { force: true }); continue; }
+    if (alive || await listening(entry.port)) found.push({ pid, endpoint: `tcp://127.0.0.1:${entry.port}` });
+    else await fs.rm(path.join(registryDir(), `RunnerEditor-${pid}.json`), { force: true });
+  }
+  return found;
+}
 async function discover() {
-  if (process.platform !== 'win32') return [];
+  if (process.platform !== 'win32') return discoverRegistry();
   const fs = require('node:fs/promises');
   let timer;
   try {
@@ -112,4 +195,4 @@ async function discover() {
       .sort((a, b) => a - b).slice(0, 256).map(pid => ({ pid, pipe: pipeFor(pid) }));
   } finally { clearTimeout(timer); }
 }
-module.exports = { discover, snapshot, inspect };
+module.exports = { discover, snapshot, inspect, registryDir };

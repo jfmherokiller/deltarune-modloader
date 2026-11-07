@@ -36,3 +36,9 @@ editor/node_modules/
 editor/runtime/build/
 editor/test-results/
 editor/dist/
+editor/.electron-*/
+out/
+compiler/build/
+compiler/**/build/
+compiler/**/bin/
+compiler/**/obj/

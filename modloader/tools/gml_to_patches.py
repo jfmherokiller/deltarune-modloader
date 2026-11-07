@@ -10,18 +10,21 @@ Usage:
   e.g. python gml_to_patches.py "E:/SteamLibrary/steamapps/common/DELTARUNE" ^
          ".../mods/LocalMultiplayer" ".../mods/LocalMultiplayerLite"
 
-Needs <game_dir>/mods/tools/utmt/UndertaleModCli.exe and ExportVanillaFor.csx next to this script.
+Needs UndertaleModCli (see utmt_cli.py: <game_dir>/mods/tools/utmt/UndertaleModCli.exe, or on Linux the
+native utmtcli / wine) and ExportVanillaFor.csx next to this script.
 Check the result by loading it: every patch should report OK in mods/modloader.gml.log.
 """
 import difflib, os, shutil, subprocess, sys, tempfile
 from concurrent.futures import ThreadPoolExecutor
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+import utmt_cli
 
 
 def export_vanilla(cli, data_win, names_dir, out_dir):
-    env = dict(os.environ, DR_NAMES_DIR=names_dir, DR_OUT_DIR=out_dir)
-    p = subprocess.run([cli, "load", data_win, "-s", os.path.join(HERE, "ExportVanillaFor.csx")],
+    env = cli.env(DR_NAMES_DIR=names_dir, DR_OUT_DIR=out_dir)
+    p = subprocess.run(cli.cmd("load", cli.path(data_win), "-s", cli.path(os.path.join(HERE, "ExportVanillaFor.csx"))),
                        stdin=subprocess.DEVNULL, capture_output=True, text=True,
                        encoding="utf-8", errors="replace", env=env)
     if p.returncode != 0:
@@ -71,9 +74,7 @@ def main():
     if len(sys.argv) != 4:
         sys.exit(__doc__)
     game, src, out = (os.path.abspath(a) for a in sys.argv[1:])
-    cli = os.path.join(game, "mods", "tools", "utmt", "UndertaleModCli.exe")
-    if not os.path.exists(cli):
-        sys.exit(f"missing {cli}")
+    cli = utmt_cli.find(game)
     if os.path.exists(out):
         sys.exit(f"{out} already exists; remove it first")
     rels = [d for d in sorted(os.listdir(src)) if os.path.isdir(os.path.join(src, d, "code")) and d.startswith("chapter")]

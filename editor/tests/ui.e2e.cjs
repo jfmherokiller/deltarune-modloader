@@ -5,6 +5,10 @@ const os = require('node:os');
 const path = require('node:path');
 const { _electron: electron } = require('playwright');
 const net = require('node:net');
+const { listenChannel } = require('./transport-fixture.cjs');
+const { electronPath } = require('../scripts/electron-path.cjs');
+// Native Electron for this OS even when node_modules came from the other OS (shared checkout).
+const launch = async options => electron.launch({ executablePath: await electronPath(), ...options });
 
 // Both endpoints are synthetic fixtures; no game is installed or launched.
 async function syntheticInspector() {
@@ -44,10 +48,9 @@ async function syntheticInspector() {
       else if(state.delay) setTimeout(reply,state.delay); else reply();
     });
   });
-  const listen=(server,name)=>new Promise((resolve,reject)=>{server.once('error',reject);server.listen(`\\\\.\\pipe\\${name}-${pid}`,resolve);});
   const stop=server=>new Promise(resolve=>server.listening ? server.close(resolve) : resolve());
-  await listen(telemetry,'RunnerEditor');
-  try { await listen(inspector,'RunnerInspector'); } catch(error) { await stop(telemetry); throw error; }
+  await listenChannel(telemetry,'snapshot',pid);
+  try { await listenChannel(inspector,'inspect',pid); } catch(error) { await stop(telemetry); throw error; }
   return {pid,state,stopTelemetry:()=>stop(telemetry),holdNext(command) {
     const hold={command,release:null}; hold.received=new Promise(resolve=>{hold.resolve=resolve;}); state.held=hold; return hold;
   },async close() {
@@ -57,7 +60,7 @@ async function syntheticInspector() {
 }
 async function launchFixture(args=[]) {
   const profile=await fs.mkdtemp(path.join(process.env.TMPDIR || os.tmpdir(),'runner-inspector-ui-'));
-  const app=await electron.launch({args:[path.resolve(__dirname,'..'),`--user-data-dir=${profile}`,...args]});
+  const app=await launch({args:[path.resolve(__dirname,'..'),`--user-data-dir=${profile}`,...args]});
   const page=await app.firstWindow(); page.setDefaultTimeout(6000);
   return {app,page,async close(){await app.close();await fs.rm(profile,{recursive:true,force:true});}};
 }
@@ -223,10 +226,10 @@ test('runtime panel connects through a SYNTHETIC local bridge and clears stale s
     protocol:1,pid,room:'SYNTHETIC_fixture_room',events:12,ageMs:0,sampledAt:Date.now(),
     runnerType:'unknown',capabilities:{inspect:true,liveCode:false,liveAssets:false}
   }) + '\n'));
-  await new Promise((resolve,reject) => { server.once('error',reject); server.listen(`\\\\.\\pipe\\RunnerEditor-${pid}`,resolve); });
+  await listenChannel(server,'snapshot',pid);
   let app;
   try {
-    app = await electron.launch({args:[path.resolve(__dirname,'..')]});
+    app = await launch({args:[path.resolve(__dirname,'..')]});
     const page = await app.firstWindow(); page.setDefaultTimeout(6000);
     await page.getByRole('button',{name:'Connect',exact:true}).click();
     await page.getByRole('button',{name:`Inspect process ${pid}`,exact:true}).click();
@@ -246,7 +249,7 @@ test('desktop starts with an honest disconnected state and local-only renderer',
   const profile = await fs.mkdtemp(path.join(process.env.TMPDIR || os.tmpdir(), 'dr-editor-ui-'));
   let app;
   try {
-    app = await electron.launch({ args: [path.resolve(__dirname, '..'), `--user-data-dir=${profile}`] });
+    app = await launch({ args: [path.resolve(__dirname, '..'), `--user-data-dir=${profile}`] });
     const page = await app.firstWindow();
     await page.getByRole('button', { name: 'Open Mod', exact: true }).waitFor();
     assert.equal(await page.locator('#runtime-status').innerText(), 'Disconnected');
@@ -264,7 +267,7 @@ test('desktop starts with an honest disconnected state and local-only renderer',
 });
 
 test('edit a real loose event, save it, search it, and preview a sprite', { timeout: 90000 }, async () => {
-  const root = await fs.mkdtemp(path.join(process.env.TMPDIR || os.tmpdir(), 'runner-workspace-'));
+  const root = await fs.mkdtemp(path.join(await fs.realpath(process.env.TMPDIR || os.tmpdir()), 'runner-workspace-'));
   const relative = 'code/gml_Object_obj_example_Create_0.gml';
   await fs.mkdir(path.join(root, 'code'));
   await fs.mkdir(path.join(root, 'sprites'));
@@ -276,7 +279,7 @@ test('edit a real loose event, save it, search it, and preview a sprite', { time
   await fs.writeFile(path.join(root, 'sprites/spr_example_0.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+afo0AAAAASUVORK5CYII=', 'base64'));
   let app;
   try {
-    app = await electron.launch({ args: [path.resolve(__dirname, '..'), `--workspace=${root}`, `--user-data-dir=${path.join(root, '.profile')}`] });
+    app = await launch({ args: [path.resolve(__dirname, '..'), `--workspace=${root}`, `--user-data-dir=${path.join(root, '.profile')}`] });
     const page = await app.firstWindow();
     page.setDefaultTimeout(6000);
     const errors = [];

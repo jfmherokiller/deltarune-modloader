@@ -1,5 +1,8 @@
 // Synthetic real Win32 pipe/lifecycle tests; never load/contact a game.
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include "../source/InspectorBridge.hpp"
+#include "../source/TcpRelay.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <thread>
@@ -57,8 +60,11 @@ int main(int argc, char** argv) {
     if (argc == 2 && std::string(argv[1]) == "--serve-synthetic") {
         std::atomic<bool> finish{false};
         std::thread sampler([&] { while (!finish) { if (auto job = b.Take()) b.Complete(job, Fixture(job->request)); Sleep(1); } });
-        puts("SYNTHETIC_INSPECTOR_READY - fixture only, NOT a game"); fflush(stdout);
+        TcpRelay relay;
+        const bool relayed = RunningUnderWine() && relay.Start();
+        printf("SYNTHETIC_INSPECTOR_READY pid=%lu relay=%d - fixture only, NOT a game\n", GetCurrentProcessId(), relayed ? 1 : 0); fflush(stdout);
         char command[16]{}; fgets(command, sizeof(command), stdin);
+        if (relayed) CHECK(relay.Stop());
         finish = true; sampler.join(); CHECK(b.Stop()); return 0;
     }
     HANDLE c = Connect();
@@ -128,6 +134,42 @@ int main(int argc, char** argv) {
         CHECK(at == length && body.back() == '\n');
         CHECK(body.find("\"addresses\":true") != std::string::npos && body.find("0xABCDEF") != std::string::npos);
         CloseHandle(h); CHECK(ce.Stop()); CHECK(editor.Stop());
+    }
+    // Wine/Proton loopback relay: token, channel and single-line checks happen before any pipe work.
+    if (RunningUnderWine()) {
+        InspectorBridge editor; CHECK(editor.Start());
+        TcpRelay relay; CHECK(relay.Start()); CHECK(relay.Port() != 0 && relay.Token().size() == 64);
+        const auto registry = relay.RegistryFile();
+        CHECK(!registry.empty() && GetFileAttributesW(registry.c_str()) != INVALID_FILE_ATTRIBUTES);
+        {   // the registry names the Unix process so Linux clients can detect stale entries
+            HANDLE f = CreateFileW(registry.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+            char json[512]{}; DWORD got = 0; CHECK(f != INVALID_HANDLE_VALUE && ReadFile(f, json, sizeof(json) - 1, &got, nullptr));
+            CloseHandle(f);
+            CHECK(strstr(json, "\"unixPid\":") && strstr(json, "\"unixStart\":\""));
+        }
+        auto exchange = [&](const std::string& text, bool serve) {
+            SOCKET s = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); CHECK(s != INVALID_SOCKET);
+            sockaddr_in a{}; a.sin_family = AF_INET; a.sin_addr.s_addr = htonl(INADDR_LOOPBACK); a.sin_port = htons(relay.Port());
+            CHECK(connect(s, reinterpret_cast<sockaddr*>(&a), sizeof(a)) == 0);
+            CHECK(send(s, text.data(), static_cast<int>(text.size()), 0) == static_cast<int>(text.size()));
+            std::thread worker;
+            if (serve) worker = std::thread([&] { auto j = Take(editor); editor.Complete(j, Fixture(j->request)); });
+            std::string out; char buf[8192]; int n;
+            while ((n = recv(s, buf, sizeof(buf), 0)) > 0) out.append(buf, n);
+            if (worker.joinable()) worker.join();
+            closesocket(s); return out;
+        };
+        const std::string head = "RUNNER-RELAY/1 " + relay.Token();
+        auto text = exchange(head + " inspect\ninstances 0\n", true);
+        CHECK(text.find("obj_SYNTHETIC") != std::string::npos && text.back() == '\n');
+        std::string wrong = relay.Token(); wrong[0] = wrong[0] == '0' ? '1' : '0';
+        CHECK(exchange("RUNNER-RELAY/1 " + wrong + " inspect\ninstances 0\n", false).empty()); CHECK(!editor.Take());
+        CHECK(exchange(head + " inspect\nglobals 0\ninstances 0\n", false).empty()); CHECK(!editor.Take());
+        CHECK(exchange(head + " cheatengine\nglobals 0\n", false).empty()); CHECK(!editor.Take());
+        CHECK(exchange(head + " snapshot\n", false).empty()); // no telemetry pipe in this process
+        CHECK(relay.Stop()); CHECK(GetFileAttributesW(registry.c_str()) == INVALID_FILE_ATTRIBUTES);
+        CHECK(editor.Stop());
+        puts("SYNTHETIC Wine relay tests passed: token, channel, single request line, registry lifetime");
     }
     puts("SYNTHETIC inspector transport tests passed: fragmented/invalid/oversized frames, expiry, single-flight, recovery, cancellation");
 }

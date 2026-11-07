@@ -15,16 +15,16 @@ xcopy /y /i /q "..\..\external\YYToolkit\YYToolkit\include\Aurie\shared.hpp" "bu
 xcopy /y /i /q "..\..\external\YYToolkit\YYToolkit\include\FunctionWrapper\FunctionWrapper.hpp" "build\include\FunctionWrapper\" >nul || exit /b 1
 git -C ..\..\external\YYToolkit rev-parse HEAD > build\YYTK_SOURCE_COMMIT.txt
 cl /nologo /std:c++latest /EHsc /O2 /MD /W4 /LD /DNDEBUG /DNOMINMAX /DYYTK_DEFINE_INTERNAL=0 /Fobuild\ /Fdbuild\ /I build\include ^
- source\ModuleMain.cpp source\RuntimeBridge.cpp source\InspectorBridge.cpp source\InspectorProtocol.cpp source\InspectorValue.cpp source\InspectorSampler.cpp build\include\YYToolkit\YYTK_Shared_Types.cpp ^
- /link /OUT:build\RunnerEditor.dll /IMPLIB:build\RunnerEditor.lib /PDB:build\RunnerEditor.pdb /DEBUG /INCREMENTAL:NO user32.lib advapi32.lib || exit /b 1
+ source\ModuleMain.cpp source\RuntimeBridge.cpp source\InspectorBridge.cpp source\InspectorProtocol.cpp source\InspectorValue.cpp source\InspectorSampler.cpp source\TcpRelay.cpp build\include\YYToolkit\YYTK_Shared_Types.cpp ^
+ /link /OUT:build\RunnerEditor.dll /IMPLIB:build\RunnerEditor.lib /PDB:build\RunnerEditor.pdb /DEBUG /INCREMENTAL:NO user32.lib advapi32.lib ws2_32.lib bcrypt.lib || exit /b 1
 echo Built editor/runtime/build/RunnerEditor.dll - NOT INSTALLED
 exit /b 0
 :tests
-cl /nologo /std:c++20 /EHsc /O2 /MD /W4 /DNOMINMAX /Fobuild\ /Fdbuild\ tests\native.cpp source\RuntimeBridge.cpp /link /OUT:build\native-tests.exe advapi32.lib || exit /b 1
+cl /nologo /std:c++20 /EHsc /O2 /MD /W4 /DNOMINMAX /Fobuild\ /Fdbuild\ tests\native.cpp source\RuntimeBridge.cpp source\TcpRelay.cpp source\InspectorBridge.cpp source\InspectorProtocol.cpp /link /OUT:build\native-tests.exe advapi32.lib ws2_32.lib bcrypt.lib || exit /b 1
 build\native-tests.exe || exit /b 1
 cl /nologo /std:c++20 /EHsc /O2 /MD /W4 /DNOMINMAX /Fobuild\ /Fdbuild\ tests\inspector.cpp source\InspectorProtocol.cpp source\InspectorValue.cpp /link /OUT:build\inspector-tests.exe || exit /b 1
 build\inspector-tests.exe || exit /b 1
-cl /nologo /std:c++20 /EHsc /O2 /MD /W4 /DNOMINMAX /Fobuild\ /Fdbuild\ tests\inspector-transport.cpp source\InspectorBridge.cpp source\InspectorProtocol.cpp source\RuntimeBridge.cpp /link /OUT:build\inspector-transport-tests.exe advapi32.lib || exit /b 1
+cl /nologo /std:c++20 /EHsc /O2 /MD /W4 /DNOMINMAX /Fobuild\ /Fdbuild\ tests\inspector-transport.cpp source\InspectorBridge.cpp source\InspectorProtocol.cpp source\RuntimeBridge.cpp source\TcpRelay.cpp /link /OUT:build\inspector-transport-tests.exe advapi32.lib ws2_32.lib bcrypt.lib || exit /b 1
 build\inspector-transport-tests.exe || exit /b 1
 cl /nologo /std:c++20 /EHsc /O2 /MD /W4 /DNOMINMAX /I tests\fake /Fobuild\ /Fdbuild\ tests\inspector-sampler.cpp source\InspectorSampler.cpp source\InspectorValue.cpp source\InspectorProtocol.cpp source\RuntimeBridge.cpp /link /OUT:build\inspector-sampler-tests.exe advapi32.lib || exit /b 1
 build\inspector-sampler-tests.exe

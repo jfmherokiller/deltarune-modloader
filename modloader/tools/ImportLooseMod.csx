@@ -180,6 +180,26 @@ static int Lev(string a, string b, int cap)
     }
     return prev[b.Length];
 }
+// ImageMagick stamps date:create/modify/timestamp tEXt chunks (and tIME) into every PNG it
+// encodes. Drop them so the same mods always produce the same data.win bytes.
+static byte[] StripPngTimestamps(ReadOnlySpan<byte> png)
+{
+    var output = new List<byte>(png.Length);
+    output.AddRange(png.Slice(0, 8).ToArray());
+    for (int at = 8; at + 12 <= png.Length;)
+    {
+        int length = (png[at] << 24) | (png[at + 1] << 16) | (png[at + 2] << 8) | png[at + 3];
+        if (length < 0 || at + 12 + length > png.Length) { output.AddRange(png.Slice(at).ToArray()); break; }
+        string type = System.Text.Encoding.ASCII.GetString(png.Slice(at + 4, 4));
+        var data = png.Slice(at + 8, length);
+        bool timestamp = type == "tIME" ||
+            (type == "tEXt" && System.Text.Encoding.Latin1.GetString(data).StartsWith("date:"));
+        if (!timestamp) output.AddRange(png.Slice(at, 12 + length).ToArray());
+        at += 12 + length;
+    }
+    return output.ToArray();
+}
+
 static (uint, uint) PngSize(string path)
 {
     using var fs = File.OpenRead(path);
@@ -245,7 +265,7 @@ void ImportSprites()
 
             var tex = new UndertaleEmbeddedTexture();
             tex.Name = new UndertaleString($"Texture {Data.EmbeddedTextures.Count}");
-            tex.TextureData.Image = GMImage.FromMagickImage(atlas).ConvertToPng();
+            tex.TextureData.Image = GMImage.FromPng(StripPngTimestamps(GMImage.FromMagickImage(atlas).ConvertToPng().ToSpan()));
             Data.EmbeddedTextures.Add(tex);
 
             foreach (var (x, y, it) in page)
@@ -456,7 +476,6 @@ if (patchFiles.Count > 0)
     Console.WriteLine($"[DR] patches: {patchOk} entr(y/ies) patched from {fileEntries.Count} file(s), {patchFail} failure(s)");
 }
 
-record Edit(string Kind, string Find, string Replace, bool All = true, int OldStart = 0);
 
 Dictionary<string, List<Edit>> ParsePatchFile(string path)
 {
@@ -632,3 +651,7 @@ if (!string.IsNullOrEmpty(pipe))
     fs.Flush();
     Console.WriteLine($"[DR] sent {ms.Length} bytes to loader");
 }
+
+// Types last: this file is also compiled as a C# program (compiler/LooseModCompiler), where
+// type declarations must follow all top-level statements.
+record Edit(string Kind, string Find, string Replace, bool All = true, int OldStart = 0);
