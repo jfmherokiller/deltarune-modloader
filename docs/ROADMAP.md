@@ -15,7 +15,8 @@ Labels used below:
 
 | Layer | BepInEx equivalent | Lives in | State |
 |---|---|---|---|
-| `version.dll` loader | Doorstop | this repo, `modloader/` | works; loose-mod file overrides only for DELTARUNE (fixed RVAs) |
+| `version.dll` bootstrap proxy | Doorstop | this repo, `modloader/src/bootstrap.c` | only parks the entry point and loads AurieCore, plus the fixes AurieCore needs (Wine early-launch, cwd, console) |
+| LooseMods | (game-specific patchers) | this repo, `modloader/loosemods` | file overrides, loose GML, `redirects.txt`; file hooks only for DELTARUNE (fixed RVAs) |
 | Aurie | (preloader) | upstream | works under Wine with our loader fix; see Aurie #23 |
 | YYToolkit | runtime glue / Il2CppInterop core | fork `deltarune`, PRs upstream | runner detection, built-ins, `ExecuteCodeObject` (PR #91) |
 | script registry + hooks by name | Harmony + interop | `modloader/yyc_interop` (`script_hooks.hpp`) | observe/redirect by name on VM and YYC, verified on both; full detours on YYC only |
@@ -57,6 +58,25 @@ BepInEx sits on top of its runtime libraries.
 
   Verified on both games with a seven-plugin test layout.
 
+## Done (2026-11-08, later)
+
+- **Thin proxy.** `version.dll` was cut down to a Doorstop-style bootstrap of about 250 lines
+  (`modloader/src/bootstrap.c`, was 794 lines). Every game-facing feature moved into the Aurie
+  module LooseMods.
+- **Less duplicated code:**
+  - LooseMods hooks with Aurie's `MmCreateHook`, not a second MinHook copy.
+  - Event redirects and `log_scripts` reuse YYToolkit's `Code_Execute` hook through
+    `EVENT_OBJECT_CALL` instead of hooking it again.
+  - Script redirects use the shared script-hook layer.
+  - The proxy loads only AurieCore; AurieCore loads the rest of `mods\native` itself.
+- **One script-hook set per process.** `script_hooks.hpp` publishes the hooks as the Aurie
+  interface `GmScriptHooks`. Later plugins attach to it instead of hooking the same routine
+  again; before this, two plugins' hooks saw each other's redirects in load order.
+- **New bug found and fixed.** A `/MD` module that `fopen`s its log before the game's CRT sets up
+  stdio receives the game's stdout. Shared fix: `modloader/include/append_log.hpp`.
+- **Task 7 fixed.** On other games, LooseMods logs "does not match this exe ...: file overrides
+  and loose GML are off" instead of "version check FAILED".
+
 ## Framework tasks
 
 1. **[feature] M: after-call hooks on VM.** `VM_PushFrame` only sees the call start. Seeing the
@@ -88,9 +108,7 @@ BepInEx sits on top of its runtime libraries.
 
 ## Loader / this repo
 
-7. **[bug] S: misleading log on other games.** `modloader.log` on Dwarf Eats Mountain says
-   "version check FAILED ... unknown DELTARUNE.exe build". That is correct but alarming; it should
-   say "not DELTARUNE, game-specific hooks off".
+7. ~~**[bug] S: misleading log on other games.**~~ Fixed with the thin proxy (see Done).
 8. **[test] S: CI.** Build the YYC plugins and run the editor's native tests under Wine in CI;
    release CI is still Windows-only (`RE/TODO.md`).
 9. **[feature] S: a release flavour without the DELTARUNE parts.** Loader, Aurie, YYToolkit and

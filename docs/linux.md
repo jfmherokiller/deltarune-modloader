@@ -12,12 +12,22 @@ Runner Studio editor natively.
 3. Loose GML / sprite / sound mods work with the **Windows** UTMT CLI in `mods/tools/utmt/`
    (the loader starts it inside Proton).
 
-Under Wine the loader also:
-- rewrites the chapter relaunch command line to an absolute `data.win` path;
-- answers `NtQueryInformationThread(ThreadSystemThreadInformation)` for the parked main thread.
-  Wine does not implement that class, so AurieCore could not tell it was in early launch, mapped
-  YYToolkit late, and YYToolkit crashed. Logged as
-  `hook NtQueryInformationThread (Wine: Aurie early-launch detection)` in `mods/modloader.log`.
+Under Wine:
+- the bootstrap proxy (`version.dll`) answers `NtQueryInformationThread(ThreadSystemThreadInformation)`
+  for the parked main thread. Wine does not implement that class, so AurieCore could not tell it
+  was in early launch, mapped YYToolkit late, and YYToolkit crashed. Logged as
+  `hook NtQueryInformationThread (Wine: Aurie early-launch detection)` in `mods/modloader.log`;
+- LooseMods (`mods/aurie/LooseMods.dll`) rewrites the chapter relaunch command line to an absolute
+  `data.win` path.
+
+To run DELTARUNE under Proton without the Steam client (no cloud-sync prompt after a killed
+run), call the Proton script directly:
+
+```sh
+STEAM_COMPAT_DATA_PATH=<library>/steamapps/compatdata/1671210 \
+STEAM_COMPAT_CLIENT_INSTALL_PATH=~/.local/share/Steam SteamAppId=1671210 \
+WINEDLLOVERRIDES="version=n,b" <proton dir>/proton run <game dir>/DELTARUNE.exe
+```
 
 ## Build (clang-cl, MSVC ABI)
 

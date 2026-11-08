@@ -54,6 +54,12 @@ jobs:
         shell: cmd
         run: call modloader\yytk_plugin\build.bat
 
+      - name: Build LooseMods and ModHost (Aurie modules)
+        shell: cmd
+        run: |
+          call modloader\loosemods\build.bat || exit /b 1
+          call modloader\modhost\build.bat
+
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: "10.0.x"

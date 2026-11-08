@@ -3,6 +3,8 @@
 usage: python tools/package_release.py <version> <out.zip>
        env YYTK_DLL   = built YYToolkit.dll          (default external build output)
        env AURIE_DLL  = AurieCore.dll (Aurie v2.0.2)  (default modloader/third_party/aurie_bin)
+       env LOOSEMODS_DLL = LooseMods.dll             (default modloader/loosemods/build)
+       env MODHOST_DLL = ModHost.dll                 (default modloader/modhost/build)
        env PLUGIN_DLL = DeltaruneYYTK.dll            (optional; shipped disabled as .example)
        env COMPILER_DIR = LooseModCompiler build     (default compiler/build/win-x64; skipped if absent)
 """
@@ -20,6 +22,8 @@ files = [  # (source, path in zip)
     (need(os.path.join(ROOT, "modloader/build/version.dll")), "version.dll"),
     (need(os.environ.get("AURIE_DLL", os.path.join(ROOT, "modloader/third_party/aurie_bin/AurieCore.dll"))), "mods/native/AurieCore.dll"),
     (need(os.environ.get("YYTK_DLL", os.path.join(ROOT, "external/YYToolkit/x64/Release/YYToolkit.dll"))), "mods/aurie/YYToolkit.dll"),
+    (need(os.environ.get("LOOSEMODS_DLL", os.path.join(ROOT, "modloader/loosemods/build/LooseMods.dll"))), "mods/aurie/LooseMods.dll"),
+    (need(os.environ.get("MODHOST_DLL", os.path.join(ROOT, "modloader/modhost/build/ModHost.dll"))), "mods/aurie/ModHost.dll"),
     (need(os.path.join(ROOT, "modloader/README.md")), "MODLOADER_README.md"),
     (need(os.path.join(ROOT, "LICENSE")), "LICENSE.txt"),
 ]
@@ -43,15 +47,17 @@ else:
     print("note: compiler/build/win-x64 not built; release relies on UTMT CLI")
 
 ini = """[loader]
+; 0 = version.dll loads nothing
 enabled=1
-; log every file the game reads (1) or only overrides (0)
-log_files=0
-; log each GML script/event name the first time it runs (research)
-log_scripts=0
-; load mods\\native\\*.dll (AurieCore) -> YYToolkit + plugins in mods\\aurie
-load_aurie=1
+; what version.dll loads before the game starts (relative to mods\\); AurieCore then loads
+; YYToolkit, LooseMods, ModHost and the other modules in mods\\aurie
+bootstrap=native\\AurieCore.dll
 ; show the Aurie Framework console window (0 = hidden, logs still go to aurie.log)
 aurie_console=0
+; LooseMods: log every file the game reads (1) or only overrides (0)
+log_files=0
+; LooseMods: log each object event / global script the first time it runs (research)
+log_scripts=0
 ; loose .gml compiler (default mods\\tools\\compiler\\LooseModCompiler.exe, else
 ; mods\\tools\\utmt\\UndertaleModCli.exe)
 ;utmt_cli=
@@ -70,6 +76,8 @@ with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         z.write(src, arc)
     z.writestr("mods/modloader.ini", ini)
     z.writestr("mods/tools/utmt/PUT_UTMT_CLI_HERE.txt", utmt_note)
+    z.writestr("mods/plugins/README.txt", "ModHost plugins: one folder per plugin with plugin.ini + the DLL.\n"
+               "See MODLOADER_README.md and modloader/modhost/README.md in the source repo.\n")
     z.writestr("VERSION.txt", ver + "\n")
     # example mods ship disabled ('_' prefix); rename the folder to enable
     for mod in sorted(os.listdir(examples)):

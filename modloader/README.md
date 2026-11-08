@@ -1,19 +1,33 @@
 # DELTARUNE mod loader (native Windows)
 
-`version.dll` proxy + MinHook. Drop-in: no exe patching, no data.win edits.
-Ported from the Wine-only prototype `mod_test/aurie_build/proxy/dllmain.c` (the `mod_test/` rig was deleted 2026-09-27; everything lives here now).
+Drop-in: no exe patching, no data.win edits. The loader is split into layers:
+
+| Layer | File | What it does |
+|---|---|---|
+| Bootstrap proxy | `version.dll` (`src/bootstrap.c`) | Loads AurieCore before any game code runs. That is all it does, like BepInEx's Doorstop |
+| Aurie | `mods\native\AurieCore.dll` | Module loader; maps `mods\aurie\*.dll` |
+| YYToolkit | `mods\aurie\YYToolkit.dll` | GameMaker runtime access (fork, `external/YYToolkit`) |
+| LooseMods | `mods\aurie\LooseMods.dll` (`loosemods/`) | The loose-mod features below: file overrides, loose GML/sprites/sounds, `redirects.txt`, the Wine chapter-relaunch fix |
+| ModHost | `mods\aurie\ModHost.dll` (`modhost/`) | Plugin host for `mods\plugins\` |
+
+All game modification happens in Aurie modules, which use Aurie's hooks and YYToolkit. The proxy
+keeps only what has to run before AurieCore exists; see "Bootstrap proxy" below.
 
 ## Build
 
 ```
-build.bat          → build\version.dll   (MSVC 2022, /MT, only imports KERNEL32)
-build.sh           → build/version.dll   (Linux: clang-cl + lld-link, same flags; see docs/linux.md)
+build.bat / build.sh               → build\version.dll   (bootstrap proxy; MSVC /MT or clang-cl, only imports KERNEL32)
+loosemods\build.bat / build.sh     → loosemods\build\LooseMods.dll
+modhost\build.bat / build.sh       → modhost\build\ModHost.dll
 ```
+
+`build.sh` variants are the Linux builds (clang-cl + lld-link, see docs/linux.md).
 
 ## Install / uninstall
 
-Copy `build\version.dll` next to `DELTARUNE.exe` and create a `mods\` folder.
-Without `mods\` the DLL loads but does nothing. Uninstall = delete `version.dll`.
+Copy `build\version.dll` next to `DELTARUNE.exe` and the release's `mods\` folder (AurieCore,
+YYToolkit, LooseMods, ModHost) next to it. Without `mods\` the DLL loads but does nothing.
+Uninstall = delete `version.dll`.
 Wine/Proton additionally needs `WINEDLLOVERRIDES="version=n,b"` as a Steam launch option, or run
 `python3 tools/proton_setup.py` once (per-exe override in the game's Proton prefix). See
 [`docs/linux.md`](../docs/linux.md).
@@ -26,7 +40,8 @@ DELTARUNE\
   mods\
     modloader.ini          optional settings
     load_order.txt         optional explicit load order (see below)
-    modloader.log          written by the loader
+    modloader.log          written by the proxy and LooseMods ([loosemods] lines)
+    native\ aurie\ plugins\ tools\   framework folders, not mods
     MyMod\
       chapter1_windows\lang\lang_en.json    ← replaces the game's file
       chapter2_windows\options.ini
@@ -42,24 +57,32 @@ DELTARUNE\
   previous. `modloader.log` prints the final order (`mod #0`, `#1`, …), and names in
   `load_order.txt` that aren't installed are logged and ignored. Within one mod,
   `all_chapters\` applies before `chapterN_windows\`, and files are processed in name
-  order. `mods\native\*.dll` also load alphabetically.
+  order.
 * **File overrides**: any file the runner reads through `ReadEntireFile` from inside
   the install folder can be replaced by the same relative path under
   `mods\<Mod>\`. The last mod in the load order wins. This covers
   each chapter's `data.win`, `lang\*.json`, `options.ini`, and `audiogroup*.dat`.
   Loose `.ogg` music/SFX is **not** covered yet, because it's streamed by another reader.
 * **Script redirects** (`redirects.txt`): `target = substitute`, one per line, `#` comments.
-  When the VM executes `target` it runs the already-compiled `substitute` instead.
-  Both must exist in the running chapter's data.win. Names are the `code/` dump names,
-  e.g. `gml_Object_obj_ui_version_Draw_0`.
+  When the game runs `target`, it runs the already-compiled `substitute` instead. Both must
+  exist in the running chapter's data.win. Names are the `code/` dump names.
+  - Object events, e.g. `gml_Object_obj_ui_version_Draw_0`, go through YYToolkit's
+    `EVENT_OBJECT_CALL`.
+  - Scripts, e.g. `gml_Script_down_p`, go through `yyc_interop/include/script_hooks.hpp`.
+    That also catches script-to-script calls, which never pass through `Code_Execute`.
 
 `modloader.ini`:
 
 ```ini
 [loader]
-enabled=1
-log_files=0     ; 1 = log every file read (research)
-log_scripts=0   ; 1 = log each GML script/event name the first time it runs
+enabled=1                         ; 0 = the proxy loads nothing
+bootstrap=native\AurieCore.dll    ; what the proxy loads, relative to mods\
+aurie_timeout_ms=30000            ; resume the game ourselves if Aurie has not
+aurie_console=0                   ; 1 = keep Aurie's console window
+log_files=0                       ; LooseMods: 1 = log every file read (research)
+log_scripts=0                     ; LooseMods: 1 = log each object event / global script the first time it runs
+;utmt_cli=                        ; LooseMods: loose GML compiler override
+gml_timeout_ms=300000             ; LooseMods: compiler timeout
 ```
 
 ## Loose GML, sprites and sounds (no xdelta, no rebuilt data.win)
@@ -166,31 +189,46 @@ mods (e.g. CheatMenu's `obj_time_Step_1` append) stack on the same scripts.
 chapter2_windows=patch.xdelta ...` keeps only the code entries the patch changed and
 warns about asset differences (export those with UTMT into `sprites\`/`sounds\`).
 
-## Aurie / YYToolkit
+## Bootstrap proxy and Aurie
 
-The loader also boots the [Aurie](https://github.com/AurieFramework/Aurie) +
-[YYToolkit](https://github.com/AurieFramework/YYToolkit) stack, so AuriePatcher is
-not needed and `DELTARUNE.exe` stays unmodified:
+The proxy boots the [Aurie](https://github.com/AurieFramework/Aurie) +
+[YYToolkit](https://github.com/AurieFramework/YYToolkit) stack. AuriePatcher is not needed and
+`DELTARUNE.exe` stays unmodified:
 
 ```
-mods\native\AurieCore.dll      Aurie v2.0.2
-mods\aurie\YYToolkit.dll       YYToolkit v5 (patched build, see yytk_plugin/)
+mods\native\AurieCore.dll      Aurie v2.0.2 (loaded by the proxy; Aurie loads any other mods\native\*.dll)
+mods\aurie\YYToolkit.dll       YYToolkit v5 (fork, external/YYToolkit)
+mods\aurie\LooseMods.dll       loose mods (loosemods/)
+mods\aurie\ModHost.dll         plugin host (modhost/)
 mods\aurie\DeltaruneYYTK.dll   example plugin (yytk_plugin/)
 ```
 
-It detours the exe's entry point and parks the main thread before any game code runs,
-the same state AuriePatcher's trampoline produces. It then loads `mods\native\*.dll`.
-AurieCore runs YYTK's early init, then resumes the game. If nothing resumes the game
-within `aurie_timeout_ms` (30 s), the loader resumes it itself.
+**Startup sequence:**
+1. The proxy detours the exe's entry point and parks the main thread before any game code
+   runs. This is the same state AuriePatcher's trampoline produces.
+2. It loads AurieCore (`bootstrap=`).
+3. AurieCore runs the early init of the modules in `mods\aurie`:
+   - YYToolkit's runner hooks;
+   - LooseMods' `ReadEntireFile` hook, which must exist before the first `data.win` read.
+4. AurieCore resumes the game. If nothing resumes it within `aurie_timeout_ms` (30 s), the
+   proxy resumes it itself.
 
-**Chapter loop fix:** AurieCore does `SetCurrentDirectoryW(<exe folder>)` at startup.
-The launcher starts each chapter as `DELTARUNE.exe -game data.win`, with the working
-directory set to `chapterN_windows\`. After Aurie's chdir, that relative `data.win`
-resolves to the root launcher's `data.win`, so pressing Play loops back to chapter
-select. The loader saves the start directory and restores it before the game's entry
-point continues.
+**What stays in the proxy, because it must be in place before AurieCore runs or fixes
+AurieCore itself:**
 
-`modloader.ini` → `load_aurie=0` disables all of this.
+- **Wine early-launch detection.** AurieCore checks for early launch with
+  `NtQueryInformationThread(ThreadSystemThreadInformation)`, which Wine does not implement.
+  The proxy answers it for the parked main thread.
+- **Working directory restore.** AurieCore does `SetCurrentDirectoryW(<exe folder>)`. The
+  launcher starts each chapter as `DELTARUNE.exe -game data.win` with the working directory
+  `chapterN_windows\`, so after the chdir the relative `data.win` resolves to the launcher's
+  and Play loops back to chapter select. The proxy restores the start directory before the
+  game's entry point continues.
+- **Hidden console.** It hides the console window AurieCore opens in every process
+  (`aurie_console=1` keeps it).
+
+Without AurieCore the proxy loads nothing and the game runs vanilla. Loose mods need the
+Aurie stack.
 
 ### YYToolkit patch (DELTARUNE runner)
 
@@ -216,7 +254,7 @@ Rebuild: clone YYToolkit `experimental` at the base commit, `git apply` the patc
 * `GetInstanceMember(<global CInstance>, name)` crashes in the runner's `YYGetString`
   (`0x1401BF58C`). Read globals with `CallBuiltin("variable_global_get", {name})`.
 * Aurie normally opens a console window ("Aurie Framework Log") in every chapter
-  process. The loader suppresses it (`AllocConsole` hook); set `aurie_console=1` in
+  process. The proxy suppresses it (`AllocConsole` hook); set `aurie_console=1` in
   `modloader.ini` to get it back. Logs still go to `aurie.log` in the game folder.
 
 ### Example plugin: `yytk_plugin/`
@@ -238,15 +276,19 @@ v5 DLL (v5 "breaks all v4 mods"); they were deleted.
 
 ## Safety
 
-The loader is pinned to DELTARUNE.exe build `TimeDateStamp 0x685E7007`
-(md5 `7bf3cccc2e54481ced3a149e1a083684`). It checks the first 16 bytes of both hooked
-functions first. After a game update that moves them, it logs
-`version check FAILED` and installs no game hooks, so the game still runs unmodded.
+The proxy contains no game addresses. LooseMods' file overrides and loose GML are pinned to
+DELTARUNE.exe build `TimeDateStamp 0x685E7007` (md5 `7bf3cccc2e54481ced3a149e1a083684`).
+LooseMods checks the first 16 bytes of `ReadEntireFile` and of the allocator first. In
+another game, or after a game update that moves them, it logs "... does not match this exe
+...: file overrides and loose GML are off" and installs no game hooks, so the game runs
+unmodded.
+
+Script redirects find their hook point by name at run time and are not pinned.
 
 ## Addresses
 
 | What | RVA | Doc |
 |---|---|---|
 | `ReadEntireFile(const char* utf8, unsigned* size)` | `0x92C40` | RE/09 |
-| `ExecuteIt(self, other, CCode*, RValue* args, int flags)` | `0x1BBC90` | RE/10 |
-| CCode list head (`next` @ +8, `name` @ +128) | `0x8C9EC8` | RE/10 |
+| Runner allocator used by `ReadEntireFile` | `0x38F430` | RE/09 |
+| CCode list head (`CCode::m_Next` @ +8, `m_Name` @ +128) | `0x8C9EC8` | RE/10 |
