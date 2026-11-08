@@ -259,6 +259,58 @@ substitutions (different event on the identical instance) are inherently safer t
 cross-object ones, since all of the object's own instance variables are guaranteed
 present either way.
 
+## Script-to-script calls bypass `Code_Execute`: `VM_PushFrame` — CONFIRMED live (2026-11-08)
+
+With `log_scripts=1`, `Code_Execute` sees only object events and `gml_GlobalScript_*` bodies
+on the chapter-select screen: 74 first runs, none of them `gml_Script_*`. Function calls
+take another path.
+
+| Address | Name | What it does |
+|---|---|---|
+| `0x1401CC280` | `DoCall` (string `"DoCall :: Execution Engine type error"`) | Bytecode call handler (`call.i` / `callv`) |
+| `0x1401CFCF0` | `VM::Exec` | Called from `Code_Execute`; runs the interpreter loop `0x1401D0160` |
+| `0x1401CF3F0` | `VM_PushFrame` (named here) | Builds the callee's frame; does not run the callee |
+| `0x1400BA7A0` | `Script_GetById` | Returns `g_ScriptCodeTable[i]`, a `CScript*` despite the `CCode` typing in the IDB |
+
+`VM_PushFrame` is the only function referencing the trace string `"script call = %s\n"`.
+That string is printed when the flag at `0x1408CA00E` is set.
+
+`DoCall` handles the call kinds as follows:
+
+- **Script ids 100000-500000:** `Script_GetById(id - 100000)` and then
+  `VM_PushFrame(script, argc, sp, vm, 0)`.
+- **Ids above 500000:** extension functions.
+- **Ids below 100000:** built-ins, through the table `unk_1408C9E40` (24 bytes per entry,
+  function at +8).
+- **Method calls (`callv`, kind `0x50000`):** `VM_PushFrame` again, with the method's
+  `CScript` (`[[BoundArgs]]` are prepended).
+
+`VM_PushFrame(CScript* s, int argc, RValue* sp, VMExec* vm, YYObjectBase* locals)`:
+
+- It saves the caller's state in a frame record on the VM stack:
+  - self/other at `vm+0x28`/`+0x30`;
+  - code at `vm+0x38`;
+  - the PC and other fields.
+- It points `vm` at the callee's `CCode` (`s->m_Code`), creates the "Locals" object and
+  returns the new stack pointer.
+- The interpreter loop then continues inside the callee. The callee's `ret` pops the frame.
+
+Consequences for hooking:
+
+- **One hook covers every bytecode script call.** An inline hook on `VM_PushFrame` sees
+  `call.i`, method calls and `script_execute`. Replacing its first argument redirects the call
+  to another `CScript`.
+- **There is no after-call point.** The callee runs after the hook returns; seeing its end
+  would need a hook on the `ret` path.
+- **It is irrelevant on YYC.** YYC runners link the same routine (Dwarf Eats Mountain
+  `exe+0xEF1350`, found by the same string), but compiled scripts call each other natively and
+  never reach it.
+
+Verified live on the DELTARUNE launcher with `modloader/yyc_interop/include/vm_hooks.hpp`:
+- 5300 script calls per 600 frames across 15 scripts;
+- a redirect of the version label's anonymous function to `scr_is_switch_os` visibly dimmed
+  the label (see `modloader/yyc_interop/README.md`).
+
 ## Not yet done / next steps
 - A real mod-loader would need to *load new bytecode from a loose file* rather than
   only redirecting between already-compiled in-`data.win` scripts — this test proves
