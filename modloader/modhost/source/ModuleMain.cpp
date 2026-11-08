@@ -4,12 +4,12 @@
 #include <YYToolkit/YYTK_Shared.hpp>
 #include <modhost.hpp>
 #include "Manifest.hpp"
+#include <append_log.hpp>
 #include <windows.h>
 #include <algorithm>
 #include <cwctype>
 #include <deque>
 #include <filesystem>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -27,8 +27,7 @@ namespace
 	};
 
 	std::deque<Loaded> g_Plugins;      // deque: PluginInfo pointers stay valid while appending
-	std::mutex g_LogLock;
-	FILE* g_Log = nullptr;
+	modloader::AppendLog g_Log;
 	bool g_IsYyc = false;
 
 	std::string Utf8(const std::wstring& w)
@@ -50,14 +49,7 @@ namespace
 
 	void WriteLog(const char* source, const char* message)
 	{
-		std::lock_guard lock(g_LogLock);
-		SYSTEMTIME t;
-		GetLocalTime(&t);
-		if (g_Log)
-		{
-			fprintf(g_Log, "[%02d:%02d:%02d.%03d] [%s] %s\n", t.wHour, t.wMinute, t.wSecond, t.wMilliseconds, source, message);
-			fflush(g_Log);
-		}
+		g_Log.Write("[%s] %s", source, message);
 		DbgPrintEx(LOG_SEVERITY_INFO, "[%s] %s", source, message);
 	}
 
@@ -162,7 +154,8 @@ EXPORTED AurieStatus ModuleInitialize(IN AurieModule* Module, IN const fs::path&
 	// mods\aurie\ModHost.dll -> mods\plugins
 	fs::path mods = ModulePath.parent_path().parent_path();
 	fs::path plugins = mods / L"plugins";
-	g_Log = _wfsopen((mods / L"modhost.log").c_str(), L"w", _SH_DENYNO);
+	DeleteFileW((mods / L"modhost.log").c_str());   // one run per log
+	g_Log.Open((mods / L"modhost.log").c_str());
 
 	YYTKInterface* yytk = GetInterface();
 	if (!yytk)

@@ -65,7 +65,9 @@ static void Install()
 		r == gm::Runner::VM ? "VM" : r == gm::Runner::YYC ? "YYC" : "unknown");
 	if (!AurieSuccess(s))
 		return;
-	if (r == gm::Runner::VM)
+	if (!gm::OwnsHooks())
+		Log("using the script hooks another plugin installed (GmScriptHooks)");
+	else if (r == gm::Runner::VM)
 		Log("VM frame-push routine exe+0x%llx, %zu scripts",
 			(unsigned long long)((uintptr_t)yyc::vm::PushFrameAddress() - (uintptr_t)GetModuleHandleW(nullptr)),
 			yyc::vm::ScriptCount());

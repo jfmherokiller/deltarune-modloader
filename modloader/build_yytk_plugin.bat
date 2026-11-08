@@ -25,7 +25,7 @@ goto args
 if not exist build mkdir build
 cl /nologo /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=1 /Fobuild\ /Fdbuild\ ^
    /I "%ROOT%\modloader\yyc_interop\include" /I "%YY%\include" /I "%YY%\source\YYTK\Shared" ^
-   /I "%ROOT%\modloader\yytk_probe\stub" ^
+   /I "%ROOT%\modloader\yytk_probe\stub" /I "%ROOT%\modloader\include" ^
    %SRCS% "%YY%\source\YYTK\Shared\YYTK_Shared_Types.cpp" ^
    /link /OUT:build\%NAME%.dll /IMPLIB:build\%NAME%.lib /PDB:build\%NAME%.pdb /DEBUG /INCREMENTAL:NO user32.lib || exit /b 1
 echo Built build\%NAME%.dll
