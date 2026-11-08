@@ -129,7 +129,7 @@ mandatory fights such as the ch4 `obj_dw_churchc_titanclimb*_post` battles.
 |---|---|
 | `global.interact` | Contact counts only at 0 or 4 (ch2–5 `obj_chaseenemy_Step_2`), or at 0 in ch1. Chasers freeze otherwise (`obj_chaseenemy_Step_0:27-41`, ch4). Not usable as a toggle, because it also freezes Kris |
 | `global.flag[encounterflag]` (ch2–5) | The result is written back by `scr_monsterdefeat.gml:92-98` (ch4) as `flag[flag[54]] = flag[50]` (1 = violence, 2 = spare, 3 = pacify, 6 = frozen). `obj_chaseenemy_Step_0:1-23` (ch4) destroys the chaser when the flag is 1, or replaces it with a frozen NPC when it is 6 |
-| `touchflag` (ch1 505-508, forest rooms) | Set **on contact**, before the battle (`obj_chaseenemy_Other_10:1-4`). It changes chaser behaviour, for example `chasetype = 3` in `room_forest_maze1` (`obj_chaseenemy_Create_0:109`) |
+| `touchflag` (ch1 505-508, forest rooms) | Set **on contact**, before the battle (`obj_chaseenemy_Other_10:1-4`). It changes chaser behaviour, for example `chasetype = 3` in `room_forest_maze1` (`obj_chaseenemy_Create_0:112`) |
 | `global.ambush` / `washit` | Decides who strikes first. `washit == 1` also lets the transition run while `interact != 0` (`obj_testoverworldenemy_Other_10:3`, ch4/5), and cutscenes use that to force a battle |
 | `global.flag[60]` | Multi-wave battles. `scr_wincombat` loads the next wave instead of ending the battle |
 
