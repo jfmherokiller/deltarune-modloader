@@ -45,3 +45,4 @@ compiler/**/obj/
 modloader/yyc_runtime_dump/build/
 modloader/yyc_interop/build/
 modloader/yyc_vm_probe/build/
+modloader/modhost/build/

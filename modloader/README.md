@@ -208,9 +208,11 @@ Rebuild: clone YYToolkit `experimental` at the base commit, `git apply` the patc
 
 ### Known YYToolkit 5.0.0 limitations here
 
-* `EVENT_FRAME` / `EVENT_RESIZE` never fire. YYTK 5.0.0 has no code path that installs
-  its Stage 3 D3D11 `Present` hook. Drive per-frame work from `EVENT_OBJECT_CALL`
-  instead (the example plugin keys off `gml_Object_obj_gamecontroller_Step_1`).
+* `EVENT_FRAME` / `EVENT_RESIZE` never fire in stock YYTK 5.0.0. It has no code path that
+  installs its Stage 3 D3D11 `Present` hook. The fork this repo pins (`external/YYToolkit`,
+  upstream PR #89) fixes this; frame callbacks were verified on DELTARUNE on 2026-11-08. With
+  a stock build, drive per-frame work from `EVENT_OBJECT_CALL` instead (the example plugin
+  keys off `gml_Object_obj_gamecontroller_Step_1`).
 * `GetInstanceMember(<global CInstance>, name)` crashes in the runner's `YYGetString`
   (`0x1401BF58C`). Read globals with `CallBuiltin("variable_global_get", {name})`.
 * Aurie normally opens a console window ("Aurie Framework Log") in every chapter
@@ -224,6 +226,15 @@ GML events, then about once a second logs the room, `global.chapter`, `global.go
 a running count of GML events. Its headers are YYTK's v5 `Shared/` headers
 (`include/YYTK_SOURCE_COMMIT.txt`). The old `mod_test/aurie_build` plugins used v4.0.1 headers, which don't match the
 v5 DLL (v5 "breaks all v4 mods"); they were deleted.
+
+### Plugins: ModHost and name-based script hooks
+
+* `modhost/` - **ModHost** goes in `mods\aurie\`. It loads plugins from
+  `mods\plugins\<folder>\`, each described by a `plugin.ini`, in dependency order. It skips
+  plugins made for the other runner type (VM/YYC) or for another game, and logs every decision
+  to `mods\modhost.log`. See `modhost/README.md`.
+* `yyc_interop/include/script_hooks.hpp` - observe or redirect GML scripts by name. One API
+  covers both runner types (see `yyc_interop/README.md`).
 
 ## Safety
 

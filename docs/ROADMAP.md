@@ -18,8 +18,8 @@ Labels used below:
 | `version.dll` loader | Doorstop | this repo, `modloader/` | works; loose-mod file overrides only for DELTARUNE (fixed RVAs) |
 | Aurie | (preloader) | upstream | works under Wine with our loader fix; see Aurie #23 |
 | YYToolkit | runtime glue / Il2CppInterop core | fork `deltarune`, PRs upstream | runner detection, built-ins, `ExecuteCodeObject` (PR #91) |
-| script registry + hooks by name | Harmony + interop | `modloader/yyc_interop` today; generic part to YYToolkit | YYC verified; VM backend missing |
-| plugin host: config, logging, load order, dependencies | BepInEx chainloader | new, this repo | missing (Aurie loads every DLL in `mods/aurie`) |
+| script registry + hooks by name | Harmony + interop | `modloader/yyc_interop` (`script_hooks.hpp`) | observe/redirect by name on VM and YYC, verified on both; full detours on YYC only |
+| plugin host: config, logging, load order, dependencies | BepInEx chainloader | `modloader/modhost` (ModHost) | manifests, runner/game filters, dependencies, config path, shared log; verified on VM and YYC |
 | tool bridge (pipe/TCP relay) | (UnityExplorer, debuggers) | `editor/runtime` (RunnerEditor) | read-only telemetry and inspector; verified on VM and YYC |
 | loose GML at runtime | (ScriptEngine) | `compiler/` + `ExecuteCodeObject` | bytecode runs on both runners; operand linking missing |
 
@@ -39,22 +39,42 @@ BepInEx sits on top of its runtime libraries.
   and the UI shows it. Verified live on Dwarf Eats Mountain (YYC) under Wine, the first live run of
   RunnerEditor on a YYC game: snapshot, globals, instances and instance fields all read.
 
+## Done (2026-11-08)
+
+- **VM script hooks** (`modloader/yyc_interop/include/vm_hooks.hpp`). Script-to-script calls on
+  VM runners bypass `Code_Execute` and go through one routine, `VM_PushFrame`. The routine is
+  found at run time by the trace string it alone references; one hook on it gives observers and
+  redirects by name. Verified on the DELTARUNE launcher under Proton. RE notes:
+  `RE/10_vm_and_scripts.md`.
+- **One API for both runners** (`script_hooks.hpp`): `gm::Init`, `gm::Observe` and
+  `gm::Redirect`. One DLL (`ScriptHookDemo`) ran on DELTARUNE (VM) and on Dwarf Eats Mountain
+  (YYC).
+- **ModHost** (`modloader/modhost`):
+  - reads `mods/plugins/*/plugin.ini` (id, version, dll, runner, game, depends, enabled);
+  - resolves the load order deterministically and logs every skip with its reason;
+  - gives plugins their folder, config path, a shared log and the runner type;
+  - the manifest rules have native unit tests.
+
+  Verified on both games with a seven-plugin test layout.
+
 ## Framework tasks
 
-1. **[feature] M: VM backend for name-based script hooks.** On VM runners every script runs through
-   `VM::Exec(CCode*, ...)`. One hook on it, filtered by `CCode` name, gives pre/post hooks per
-   script; `yyc_interop`'s registry API stays the same.
-   - Locate `VM::Exec` from `Code_Execute`'s tail call (shown on the YYC runner:
-     `0x140EF1C30`). Then verify that nested script-to-script calls reach it on a VM game.
-   - Needs a live DELTARUNE run.
-2. **[feature] M: one hook API for both runners.** `Hook("name", pre, post)` with a native-detour
-   backend on YYC and a `VM::Exec` filter backend on VM, plus `CallScript` on VM through
-   `script_execute`. Then propose the API to YYToolkit as `CreateScriptHook`/`CallScript`
-   (upstream).
-3. **[feature] M: plugin host.** A loader-side manifest per plugin covering name, version,
-   dependencies and target game/runner. It also provides a config file per plugin, a log per
-   plugin (instead of each DLL opening its own file) and a deterministic load order. Plugins with
-   unmet dependencies or the wrong runner type are skipped with a log line.
+1. **[feature] M: after-call hooks on VM.** `VM_PushFrame` only sees the call start. Seeing the
+   end needs the interpreter's `ret`/frame-pop path, which is not yet located; the interpreter
+   loop is `0x1401D0160` in DELTARUNE. With it, `gm::` could offer post-observers and result
+   replacement on VM, as `yyc::Hook` already does on YYC.
+2. **[feature] M: native replacement of VM scripts.** On VM, run a C++ function instead of a
+   script, the counterpart of `yyc::Hook`. Possible routes:
+   - a stub `CScript` whose code is a one-instruction bytecode thunk calling a registered
+     built-in;
+   - a redirect to a script compiled at run time (task 4).
+
+   `CallScript` on VM, through `script_execute`, belongs here too.
+3. **[feature] S: ModHost follow-ups.**
+   - plugins that must load in Aurie's early-launch phase (today they stay in `mods/aurie`);
+   - `MdUnmapImage` on request, for the editor;
+   - a per-plugin log file option;
+   - listing loaded plugins over the RunnerEditor pipe.
 4. **[feature] L: runtime linking of compiled GML.** Turn Underanalyzer output into a runnable
    `CCode`: rewrite variable, built-in and string operands to runtime ids, and route script calls
    through `script_execute`. Shared by VM and YYC (`compiler/RUNTIME_COMPILER.md`,
@@ -96,7 +116,8 @@ BepInEx sits on top of its runtime libraries.
     `editor/runtime/README.md`).
 15. **[feature] M: a script panel.** List compiled scripts and events with their runtime index
     (from the registry), call counts from an opt-in counting hook, and on YYC the native address.
-    This is the editor's view of the hook layer.
+    This is the editor's view of the hook layer. `gm::Observe("")` gives the VM call counts now;
+    on YYC the counts need opt-in per-script observers.
 16. **[feature] L: live code.** Once task 4 works, "Run GML" and "replace script" behind their own
     capability, VM and YYC tested separately.
 17. **[feature] M: arrays/structs, watches, freezes** (inspector tiers C/D).
@@ -121,14 +142,38 @@ BepInEx sits on top of its runtime libraries.
     "finished". Document it, or return success when the callback never asked to stop.
 23. **[bug] Aurie #23.** Modules that call Aurie from CRT init fail to load under Wine. Workaround
     in our plugins: no static `RValue`.
-24. **[feature] M: public script lookup/hook API** (framework task 2) and a public
+24. **[feature] M: public script lookup/hook API** (`script_hooks.hpp` is the reference) and a public
     built-in-by-index enumeration. `YYCRuntimeDump` currently scans `.rdata` strings because there
     is no index API; YYToolkit already has `YkExtractFunctionEntry` internally.
 25. **[feature] S: `YYTK_MINOR` bump plus a feature query**, so plugins can detect new methods
     (framework task 6).
 
-## Needs a decision from the owner
+26. **[bug] S: `screen_save` ends DELTARUNE under Proton.** `screen_save`, called through
+    `CallBuiltin` from an `EVENT_OBJECT_CALL` callback, writes the PNG and then the DELTARUNE
+    process ends. Nothing is logged after the call. The same call works on Dwarf Eats Mountain
+    under Wine. The cause is unknown.
 
-- Permission to run DELTARUNE under Wine/Proton for the VM-backend tests (tasks 1, 2, 14).
-- Whether the plugin host is a new component here (recommended) or goes into YYToolkit.
-- Which tasks go upstream as PRs and which stay on the fork.
+## What goes upstream (proposed policy)
+
+Decided 2026-11-08: ModHost lives in this repo.
+
+Send upstream (YYToolkit/Aurie) only what is:
+- generic, i.e. useful to any YYToolkit user and not tied to DELTARUNE or to our loader;
+- small;
+- verified in a game.
+
+How:
+- **Bug fixes:** PR directly, with the evidence (done for #85–#89).
+- **New API:** open an issue first, then the PR (done for #90 → #91).
+- **Pacing:** do not open more PRs while #85–#91 have had no response. Keep stacking them on the
+  fork's `deltarune` branch instead, which this repo already pins.
+
+| Work | Where | Why |
+|---|---|---|
+| Callback dispatch race (task 21) | upstream PR, once the open ones get a response | bug in YYToolkit itself |
+| `EnumInstanceMembers` status (task 22) | upstream issue first | behaviour change; maintainer's call |
+| `YYTK_MINOR` bump + feature query (task 25) | upstream PR together with #91 | only matters once new methods exist |
+| Script lookup/hook API (task 24) | upstream issue with `script_hooks.hpp` as the reference; PR only if wanted | large, opinionated API |
+| Aurie #23 fix | upstream PR if the maintainer picks an approach | design choice in Aurie |
+| ModHost, RunnerEditor, loader, interop headers, DELTARUNE parts | this repo | framework layer on top of YYToolkit, like BepInEx |
+| `yyc_vm_probe`, dumpers | this repo | research tools |
