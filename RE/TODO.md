@@ -1,5 +1,7 @@
 # TODO / Workflow
 
+Open tasks are tracked in `docs/ROADMAP.md` (numbered); this file keeps the RE log and evidence.
+
 ## Own GML compiler (2026-11-06)
 
 - [x] `compiler/LooseModCompiler`: ImportLooseMod.csx built against the UndertaleModLib submodule (0.9.2.0); loader prefers it over the UTMT CLI. Byte-identical output; ~2x faster under Wine. See `compiler/README.md`.
@@ -89,8 +91,8 @@ Overview and evidence: `../docs/yyc_il2cpp.md`. Test game: Dwarf Eats Mountain 1
 - [x] `yytk_probe` fixed for Wine (static `RValue` constructed during CRT init blocked mapping).
 - [ ] Runtime linking of compiled GML (operands → runtime ids, strings) shared with the VM-game
   runtime compiler; then loose GML mods on YYC.
-- [ ] A public "execute CCode" call in the YYToolkit fork, instead of borrowing its ExecuteIt
-  trampoline (upstreaming stays the owner's call).
+- [x] A public "execute CCode" call in the YYToolkit fork: `ExecuteCodeObject` + `IsYYCRunner`
+  (fork `deltarune`, upstream PR #91).
 - [ ] Repeat on a second YYC game / runner version.
 
 
@@ -871,7 +873,9 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
         `typeIndex` is confirmed debug-build-only and unreliable in this shipped
         build, a genuine dead end, not just unexplored. Docs:
         `cheatengine/README.md#live-instance-listing-list_instances-added-2026-09-17`.
-- [ ] **UndertaleModTool CLI — dump all 5 chapters.** `code/` is ~chapter 1 only. For
+- [x] **UndertaleModTool CLI — dump all 5 chapters** (2026-11-08: `utmtcli dump <data.win> -c
+      UMT_DUMP_ALL`, copied to `code/chapterN/`, gitignored; 1293/5840/7603/10268/11853 entries).
+      Original note: `code/` is ~chapter 1 only. For
       each `chapterN_windows/data.win`:
       `utmtcli dump <data.win> --code --strings ... < /dev/null` (check `utmtcli dump --help`).
       Land them under `code/chapterN/` (keep the flat filename scheme). Also try a UTMT
@@ -917,7 +921,8 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
             game (YYC and VM); add probes for SetBuiltin, instance create/destroy, room_goto,
             sprite_replace; decide the editor UI process (separate native window talking to an
             in-game YYTK plugin over a pipe, not an in-game ImGui overlay).
-      - [ ] Re-test the whole stack under Wine (Aurie's MmCreateHook hung there before).
+      - [x] Re-test the whole stack under Wine (Aurie's MmCreateHook hung there before): works
+            with the loader's NtQueryInformationThread fix (Aurie #22 comment, 2026-11-07).
       - [ ] Port the old `mod_test/aurie_build` plugin ideas to the v5 headers.
 - [x] **Cleanup** (2026-09-27): deleted the whole `mod_test/` Wine rig (800 MB: proxy
       prototype, v4 ExamplePlugin/ourplugin, version_*_test.dll experiments,

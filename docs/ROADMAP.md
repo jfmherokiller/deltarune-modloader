@@ -117,8 +117,7 @@ BepInEx sits on top of its runtime libraries.
     game.
 11. **[bug] S: version checks in `yyc_vm_probe`.** It hard-codes `CCode` offsets from 2024.14;
     check the runner version before use, or derive the offsets from `Code_Execute`.
-12. Open items carried over from `RE/TODO.md`: CheatMenu battle test, streamed `.ogg` audio
-    overrides, sprite size-change behaviour, DialogueBacklog in-game test.
+12. Replaced by the specific tasks 33–40 below (2026-11-08).
 
 ## Runner Studio editor
 
@@ -170,6 +169,64 @@ BepInEx sits on top of its runtime libraries.
     `CallBuiltin` from an `EVENT_OBJECT_CALL` callback, writes the PNG and then the DELTARUNE
     process ends. Nothing is logged after the call. The same call works on Dwarf Eats Mountain
     under Wine. The cause is unknown.
+
+## Mods and tools (2026-11-08 scan)
+
+The CheatMenu items come from `mods_examples/CheatMenu/RESEARCH.md`, which has the storage
+locations and code-entry evidence for each one.
+
+27. **[feature] M: CheatMenu "Money..." page.** Replace the Gold row with a page built from a
+    currency table. Each entry is name, chapters, storage and cap; the page shows the entries for
+    the current chapter:
+
+    | Currency | Storage | Chapters |
+    |---|---|---|
+    | D$ | `global.gold` | all |
+    | Light World $ | `global.lgold` | all |
+    | PT | `flag[1044]` | 3 and 4 (Ch4 spends PT at Gerson's table) |
+    | Board points | `flag[1117]` | 3 |
+    | Flowery Dollars (F$) | `flag[1411]` | 5 |
+    | Pink Dollars (P$) | `flag[1312]` | 5 |
+
+    Rules:
+    - Never touch `flag[1412]`, the Ch5 F$ reveal state.
+    - Clamp values to 0..99999.
+    - While `flag[1412] == 1`, explain that the money box shows D$ + F$ but D$ shops only take
+      `global.gold`.
+28. **[feature] S: CheatMenu walk/run speed.** Multiply `obj_mainchara.bwspeed`; the game derives
+    `wspeed` from it every step. Restore it on toggle-off and on room change. Platformer and
+    climbing sections use other objects; check them separately.
+29. **[feature] S: CheatMenu Light World page.** `global.lhp`, `lmaxhp`, `lat`, `ldf`, `llv`, `lxp`
+    (and `lgold`, via task 27).
+30. **[feature] M: CheatMenu instant battle win.** Call `scr_wincombat`, which exists in every
+    chapter. Skip the enemies in `scr_drcheat_nospare` (scripted fights). Check the rewards and flags
+    the win screen sets.
+31. **[feature] M: CheatMenu flag viewer/editor.** Show `global.flag[n]` and `global.plot`, with a
+    confirm step before writes. The game's flag-name table is stripped from release builds, so ship
+    our own list of known flags, starting with the ones in RESEARCH.md.
+32. **[research] S: `global.debug`, encounters, room warp.**
+    - `scr_debug()` gates 136 Ch5 code entries, while `scr_debug_keycheck` is an empty stub in
+      release builds; find out what the remaining branches do.
+    - Check whether `global.encounterno` gives a usable encounter toggle.
+    - Room warp (`room_goto`) is risky for story state; decide whether it is worth offering.
+33. **[test] S: CheatMenu inside a battle** (freeze during the bullet phase), from `RE/TODO.md`.
+34. **[test] S: DialogueBacklog in-game test** (open, scroll and close in overworld and battle;
+    `RE/TODO.md`).
+35. **[feature] S: cache the loose-GML compile.** Key it on the vanilla `data.win` hash plus the mod
+    files' mtimes. Chapter 5 with three mods takes about 4 s on every chapter launch today.
+36. **[feature] M: streamed `.ogg` overrides.** Music beside `data.win` and in `mus\` is opened by
+    the audio engine, not `ReadEntireFile`.
+37. **[feature] S: sprite size-change behaviour.** Decide the resize/origin rules for frames whose
+    size differs from the original.
+38. **[test] S: Windows builds and the release workflow.** Not run since the thin-proxy change:
+    `modloader/build.bat`, `loosemods/build.bat`, `modhost/build.bat`, `yyc_interop/build.bat`,
+    `.github/workflows/release.yml`.
+39. **[feature] S: `log_scripts` for scripts too.** LooseMods logs only what passes through
+    `Code_Execute` (events, global scripts). `gm::Observe("")` would add script calls on VM.
+40. **[feature] M: Cheat Engine dissector follow-ups.** Symbol lookup callback (`global.gold`) and
+    array element expansion (`RE/TODO.md`).
+41. **[test] S: RunnerCompiler spike live run**, then `compiler/tools/compare_runtime_bytecode.py`
+    to derive the load-time operand fixup. This is the first step of task 4.
 
 ## What goes upstream (proposed policy)
 
