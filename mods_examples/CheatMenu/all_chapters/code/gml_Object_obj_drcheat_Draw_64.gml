@@ -214,7 +214,13 @@ for (var i = 0; i < array_length(drc_rows); i++)
         draw_set_color(c_gray);
     draw_text(rx, y0, drc_rows[i]);
     var v = "";
-    switch (i)
+    var _ri = (i > drc_row_puzzle) ? i - 1 : i;
+    if (i == drc_row_puzzle)
+    {
+        v = (global.drcheat_puzzlet == 2) ? "FROZEN" : ((global.drcheat_puzzlet == 1) ? "SLOW x3" : "OFF");
+        _ri = -1;
+    }
+    switch (_ri)
     {
         case 0: v = "< " + string(global.gold) + " >"; break;
         case 3: v = global.drcheat_lockhp ? "ON" : "OFF"; break;

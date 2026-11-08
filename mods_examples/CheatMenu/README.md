@@ -10,6 +10,7 @@ freezes and a cheat overlay opens.
 | Gold | ←/→ ±10 (Shift ±1000) |
 | Heal party / Fill TP | Z |
 | Lock HP / No damage / Infinite TP | Z or ←/→ toggles; stays active after closing. Also covers Chapter 3's game-show board hearts |
+| Puzzle timer | Z or ←/→ cycles OFF / SLOW x3 / FROZEN for the glow-tile puzzle timers (Chapters 1, 3 and 5, e.g. Chapter 5's `room_dw_garden_hardpressureplates`); stays active after closing. Pauses itself for Chapter 5's scripted four-switch puzzle, which the story needs you to fail |
 | Character | ←/→ picks the party member for the stat rows |
 | AT / DF / MAG / Max HP | ←/→ ±1 (Max HP ±10; Shift ×10) |
 | Inventory... | Z opens the inventory editor (below) |

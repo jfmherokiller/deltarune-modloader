@@ -14,6 +14,11 @@ if (!variable_global_exists("drcheat_automercy"))
     global.drcheat_automercy = 0;
     global.drcheat_ensel = 0;
 }
+// glow-tile puzzle timers (Ch1/3 obj_glowtilepuzz, Ch5 obj_glowtile_puzzle_new): 0 off, 1 slow x3, 2 frozen
+if (!variable_global_exists("drcheat_puzzlet"))
+    global.drcheat_puzzlet = 0;
+drc_ptick = 0;
+drc_row_puzzle = 6;   // rows after this one keep their old switch numbers (see Step/Draw)
 if (!variable_global_exists("drcheat_invcat"))
 {
     global.drcheat_invcat = 0;
@@ -26,11 +31,11 @@ drc_hold = 0;
 drc_msg = "";
 drc_msgtime = 0;
 drc_names = ["?", "Kris", "Susie", "Ralsei", "Noelle"];
-drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "Close"];
+drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Puzzle timer", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "Close"];
 // Chapter 3 only: TV show page (points + saved board rankings)
 drc_has_tv = global.chapter == 3;
 if (drc_has_tv)
-    drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "TV Show...", "Close"];
+    drc_rows = ["Gold", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Puzzle timer", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "TV Show...", "Close"];
 global.drcheat_tvsel = 0;
 // flag 1044 = points (PTs), 1173/1174 = saved rank of board 1/2 (0 Z, 1 C, 2 B, 3 A, 4 S, 5 T).
 // The ranks unlock the ranking-room doors (A>=3, B>=2, C>=1) and the T-rank room (5).

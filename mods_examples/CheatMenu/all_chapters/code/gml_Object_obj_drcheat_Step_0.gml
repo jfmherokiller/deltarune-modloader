@@ -94,6 +94,34 @@ if (!global.drcheat_open)
     }
     if (global.drcheat_inftp && _hastp && global.tension < global.maxtension)
         global.tension = global.maxtension;
+    if (global.drcheat_puzzlet > 0)
+    {
+        // Give back the frame the puzzle just spent: always when frozen, 2 of every 3 when slowed.
+        // Skipped where the game needs the puzzle to fail: Chapter 5's four-switch scene
+        // (obj_ch5_DW05 waits for failtimer <= 0, and the timeout must happen before the
+        // party's caterpillars it dooms are destroyed, or the fail cleanup reads a dead instance).
+        drc_ptick = (drc_ptick + 1) mod 3;
+        var _scripted = asset_get_index("obj_ch5_DW05");
+        var _safe = !(_scripted >= 0 && instance_exists(_scripted));
+        var _mz = asset_get_index("obj_marker_z");
+        if (_safe && _mz >= 0)
+            with (_mz)
+                if (variable_instance_exists(id, "mycaterpillar") && !instance_exists(mycaterpillar))
+                    _safe = false;
+        if (_safe && (global.drcheat_puzzlet == 2 || drc_ptick != 0))
+        {
+            var _gp = asset_get_index("obj_glowtile_puzzle_new");   // Ch5: counts failtimer down
+            if (_gp >= 0)
+                with (_gp)
+                    if (state == 1 && cutscene_mode == 0 && bonus_delay <= 0)
+                        failtimer += 1;
+            _gp = asset_get_index("obj_glowtilepuzz");              // Ch1/3: counts up to failmax
+            if (_gp >= 0)
+                with (_gp)
+                    if (active == 1 && failtimer > 0)
+                        failtimer -= 1;
+        }
+    }
     if (global.drcheat_automercy && drc_in_battle())
     {
         for (var i = 0; i < 3; i++)
@@ -363,7 +391,19 @@ if (global.char[slot] <= 0)
     slot = 0;
 var ch = global.char[slot];
 
-switch (global.drcheat_sel)
+var _sel = global.drcheat_sel;
+if (_sel == drc_row_puzzle)
+{
+    if (ok || step != 0)
+    {
+        global.drcheat_puzzlet = (global.drcheat_puzzlet + (step < 0 ? 2 : 1)) mod 3;
+        snd_play(snd_select);
+    }
+    _sel = -1;
+}
+else if (_sel > drc_row_puzzle)
+    _sel--;
+switch (_sel)
 {
     case 0:
         if (step != 0) { global.gold = max(0, global.gold + step * (big ? 1000 : 10)); snd_play(snd_menumove); }
