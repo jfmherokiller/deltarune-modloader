@@ -46,7 +46,7 @@ Replace the Gold row with a **Money...** page built from a table of entries `{na
 | Light World stats | `global.lhp`, `lmaxhp`, `lat`, `ldf`, `llv`, `lxp`, `lweapon` | 1–5 | Light World is short in every chapter; probably a small page |
 | Instant battle win | `scr_wincombat` exists in every chapter (two entries in Ch4) | 1–5 | Has to respect the scripted battles that `scr_drcheat_nospare` already lists; check what the win screen expects (gold, XP-equivalents, flags) |
 | Encounter control | `global.encounterno` (77 uses in Ch5) | 1–5 | Research needed: Dark World encounters are mostly placed enemies, not random |
-| Flag viewer/editor | `global.flag[0..]`, `global.plot` | 1–5 | Power-user page: read any flag, edit with a confirm step. The flag-name table (`scr_flag_names`) is stripped from release builds, so the page needs its own list of known flags (the numbers in this file are a start) |
+| Flag viewer/editor | `global.flag[0..]`, `global.plot` | 1–5 | Power-user page: read any flag, edit with a confirm step. The flag-name table (`scr_flag_names`) is stripped from release builds, so the page uses our own list: `data/flags.json` (1499 flags, `global.plot` milestones per chapter; see `data/README.md`), compiled in as `scr_drcheat_flagnames()` / `scr_drcheat_plotnames()` |
 | Room warp | `room_goto` | 1–5 | High risk for story state (`global.plot`). Only worth offering with a warning and limited to rooms already visited |
 | `global.debug` | `scr_debug()` returns `global.debug == 1`; 136 code entries in Ch5 test it | 1–5 | `scr_debug_keycheck` is an empty stub in release builds, so the developer hotkeys are gone. What the remaining `scr_debug()` branches do is unknown; research before exposing |
 
