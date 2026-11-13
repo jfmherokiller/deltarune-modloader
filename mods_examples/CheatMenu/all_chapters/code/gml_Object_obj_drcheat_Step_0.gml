@@ -21,37 +21,6 @@ if (!global.drcheat_open)
     }
     if (global.drcheat_nodmg && variable_global_exists("inv") && global.inv < 30)
         global.inv = 30;
-    // Ch3 TV minigames: cooking show (obj_chefs_game), rhythm game (obj_rhythmgame), Susiezilla.
-    // assist keeps you from losing; top score sets each game's own score past its best grade
-    // (cooking: 640 = T, and >= the 400 goal ends the show as a win; rhythm: 28000 = the game's
-    // own debug top score; Susiezilla: 800+ = ultimate victory on the next defeated enemy).
-    if (global.drcheat_mgassist || global.drcheat_mgmax)
-    {
-        var _top = global.drcheat_mgmax;
-        global.drcheat_mgmax = 0;
-        var _o = asset_get_index("obj_chefs_game");
-        if (_o >= 0)
-            with (_o)
-            {
-                if (min_pts < 0) min_pts = 0;
-                if (_top && !gameover) scorepoints = max(scorepoints, 640);
-            }
-        _o = asset_get_index("obj_rhythmgame");
-        if (_o >= 0)
-            with (_o)
-            {
-                fame = max_fame;
-                if (_top) points = max(points, 28000);
-            }
-        _o = asset_get_index("obj_susiezilla_statue");
-        if (_o >= 0)
-            with (_o)
-                if (hp > 0) hp = maxhp;
-        _o = asset_get_index("obj_susiezilla_singlescreen_hud_score");
-        if (_o >= 0 && _top)
-            with (_o)
-                my_score = 999;
-    }
     // Ch3 game-show board: party health is obj_mainchara_board.myhealth (hearts), copied into global.hp
     // by scr_board_battlehealth, and hits check the character's own iframes, not global.inv
     var _mb = asset_get_index("obj_mainchara_board");
@@ -124,21 +93,15 @@ if (!global.drcheat_open)
                         failtimer -= 1;
         }
     }
-    if (global.drcheat_automercy && drc_in_battle())
-    {
-        for (var i = 0; i < 3; i++)
-        {
-            if (drc_en_alive(i) && !drc_en_nospare(i) && global.mercymod[i] < drc_en_mercymax(i))
-                drc_en_spareable(i);
-        }
-    }
+    // the pages' own always-on cheats (enemy auto mercy, TV minigame assist, ...)
+    for (var _p = 1; _p < array_length(drc_pages); _p++)
+        script_execute(drc_pages[_p].scr, "tick");
 }
 
 // ---- open / close
 if (global.drcheat_open && global.drcheat_page != 0 && keyboard_check_pressed(ord("X")))
 {
-    if (global.drcheat_page == 1)
-        drc_inv_compact();
+    drc_page_call("leave");
     global.drcheat_page = 0;
     snd_play(snd_smallswing);
     exit;
@@ -151,6 +114,8 @@ if (keyboard_check_pressed(vk_f7) || (global.drcheat_open && keyboard_check_pres
         var sh = surface_get_height(application_surface);
         drc_shot = sprite_create_from_surface(application_surface, 0, 0, sw, sh, false, false, 0, 0);
         drc_battle_open = instance_exists(obj_battlecontroller);
+        for (var _p = 1; _p < array_length(drc_pages); _p++)
+            script_execute(drc_pages[_p].scr, "opened");
         audio_pause_all();
         // remember what was active so closing doesn't wake things the game deactivated itself
         drc_frozen = [];
@@ -173,17 +138,6 @@ if (!global.drcheat_open)
     exit;
 
 // ---- menu input (read the keyboard directly; the game's input objects are deactivated)
-var n = array_length(drc_rows);
-if (keyboard_check_pressed(vk_up))
-{
-    global.drcheat_sel = (global.drcheat_sel + n - 1) mod n;
-    snd_play(snd_menumove);
-}
-if (keyboard_check_pressed(vk_down))
-{
-    global.drcheat_sel = (global.drcheat_sel + 1) mod n;
-    snd_play(snd_menumove);
-}
 var dir = keyboard_check(vk_right) - keyboard_check(vk_left);
 var step = 0;
 if (dir != 0)
@@ -198,213 +152,30 @@ else
 }
 var big = keyboard_check(vk_shift);
 var ok = keyboard_check_pressed(ord("Z")) || keyboard_check_pressed(vk_enter);
+drc_step = step;
+drc_big = big;
+drc_ok = ok;
+if (drc_msgtime > 0)
+    drc_msgtime--;
 
-
-// ---- inventory page
-if (global.drcheat_page == 1)
+// ---- sub page: its own script handles the input
+if (global.drcheat_page != 0)
 {
-    if (!drc_inv_ready)
-        drc_inv_build();
-    var cat = clamp(global.drcheat_invcat, 0, 3);
-    var ns = drc_inv_slots(cat);
-    var r = clamp(global.drcheat_invsel, -1, ns - 1);
-    if (keyboard_check_pressed(vk_up))
-    {
-        r = (r <= -1) ? (ns - 1) : (r - 1);
-        snd_play(snd_menumove);
-    }
-    if (keyboard_check_pressed(vk_down))
-    {
-        r = (r >= ns - 1) ? -1 : (r + 1);
-        snd_play(snd_menumove);
-    }
-    if (r == -1 && step != 0)
-    {
-        cat = (cat + 4 + step) mod 4;
-        snd_play(snd_menumove);
-    }
-    else if (r >= 0 && step != 0)
-    {
-        // cycle through the ids the game has names for (0 = empty)
-        var ids = drc_inv_ids[cat];
-        var cnt = array_length(ids);
-        var cur = drc_inv_get(cat, r);
-        var pos = 0;
-        for (var k = 0; k < cnt; k++)
-        {
-            if (ids[k] == cur) { pos = k; break; }
-        }
-        pos = (pos + cnt + step * (big ? 5 : 1)) mod cnt;
-        if (pos < 0) pos += cnt;
-        drc_inv_set(cat, r, ids[pos]);
-        snd_play(snd_menumove);
-    }
-    if (r >= 0 && (keyboard_check_pressed(vk_delete) || keyboard_check_pressed(vk_backspace) || keyboard_check_pressed(ord("C"))))
-    {
-        drc_inv_set(cat, r, 0);
-        snd_play(snd_smallswing);
-    }
-    global.drcheat_invcat = cat;
-    global.drcheat_invsel = r;
-    if (drc_msgtime > 0)
-        drc_msgtime--;
+    drc_page_call("step");
     exit;
 }
 
-
-// ---- money page: rows come from the drc_money table (Create), filtered to this chapter
-if (global.drcheat_page == 5)
+// ---- main page
+var n = array_length(drc_rows);
+if (keyboard_check_pressed(vk_up))
 {
-    var nr = array_length(drc_money_rows);
-    var r = clamp(global.drcheat_monsel, 0, max(0, nr - 1));
-    if (nr > 0)
-    {
-        if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
-        if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
-        if (step != 0)
-        {
-            var _m = drc_money_rows[r];
-            drc_money_set(_m, drc_money_get(_m) + step * (big ? drc_money[_m].big : drc_money[_m].step));
-            snd_play(snd_menumove);
-        }
-    }
-    global.drcheat_monsel = r;
-    exit;
+    global.drcheat_sel = (global.drcheat_sel + n - 1) mod n;
+    snd_play(snd_menumove);
 }
-
-// ---- recruit page: left/right adjusts the count; C/Del resets a lost type to zero
-if (global.drcheat_page == 4)
+if (keyboard_check_pressed(vk_down))
 {
-    var nr = drc_rec_count;
-    var r = clamp(global.drcheat_recsel, 0, max(0, nr - 1));
-    if (nr > 0)
-    {
-        if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
-        if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
-        var _cur = drc_rec_current(r);
-        if (step != 0)
-        {
-            var _next = clamp(max(0, _cur) + step * (big ? 5 : 1), 0, drc_rec_max[r]);
-            global.flag[600 + drc_rec_ids[r]] = _next / drc_rec_max[r];
-            snd_play(snd_menumove);
-        }
-        if (keyboard_check_pressed(vk_delete) || keyboard_check_pressed(vk_backspace) || keyboard_check_pressed(ord("C")))
-        {
-            global.flag[600 + drc_rec_ids[r]] = 0;
-            snd_play(snd_smallswing);
-        }
-    }
-    global.drcheat_recsel = r;
-    exit;
-}
-
-// ---- Chapter 3 TV show page
-if (global.drcheat_page == 3)
-{
-    var nr = array_length(drc_tv_rows);
-    var r = clamp(global.drcheat_tvsel, 0, nr - 1);
-    if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
-    if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
-    if (step != 0)
-    {
-        if (r == 0)
-            global.flag[1044] = clamp(global.flag[1044] + step * (big ? 1000 : 100), 0, 9999);
-        else if (r == 3)
-            global.drcheat_mgassist = !global.drcheat_mgassist;
-        else if (r == 4)
-        {
-        }
-        else
-        {
-            var f = (r == 1) ? 1173 : 1174;
-            global.flag[f] = clamp(global.flag[f] + step, 0, 5);
-        }
-        snd_play(snd_menumove);
-    }
-    if (ok && r == 3)
-    {
-        global.drcheat_mgassist = !global.drcheat_mgassist;
-        snd_play(snd_select);
-    }
-    if (ok && r == 4)
-    {
-        global.drcheat_mgmax = 1;
-        drc_msg = "Applied on close"; drc_msgtime = 60; snd_play(snd_select);
-    }
-    global.drcheat_tvsel = r;
-    if (drc_msgtime > 0)
-        drc_msgtime--;
-    exit;
-}
-
-
-// ---- enemy page
-if (global.drcheat_page == 2)
-{
-    var rows = drc_en_rows();
-    var nr = array_length(rows);
-    var r = clamp(global.drcheat_ensel, 0, nr - 1);
-    if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
-    if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
-    var kind = rows[r][0];
-    var e = rows[r][1];
-    var fight = drc_in_battle();
-    switch (kind)
-    {
-        case 0:
-            if (ok || step != 0) { global.drcheat_automercy = !global.drcheat_automercy; snd_play(snd_select); }
-            break;
-        case 1:
-            if (ok && fight)
-            {
-                var done = 0;
-                var skipped = 0;
-                for (var i = 0; i < 3; i++)
-                {
-                    if (!drc_en_alive(i)) continue;
-                    if (drc_en_nospare(i)) { skipped++; continue; }
-                    drc_en_spareable(i);
-                    done++;
-                }
-                if (done == 0 && skipped > 0) { drc_msg = "Can't be spared"; snd_play(snd_smallswing); }
-                else { drc_msg = (skipped > 0) ? "Spareable (some can't be)" : "All can be spared"; snd_play(snd_select); }
-                drc_msgtime = 60;
-            }
-            break;
-        case 2:
-            if (ok && fight)
-            {
-                for (var i = 0; i < 3; i++)
-                    if (drc_en_alive(i)) global.monsterhp[i] = 1;
-                drc_msg = "Enemy HP set to 1"; drc_msgtime = 60; snd_play(snd_select);
-            }
-            break;
-        case 10:
-            if (step != 0)
-            {
-                global.monsterhp[e] = clamp(global.monsterhp[e] + step * (big ? 100 : 10), 1, max(1, global.monstermaxhp[e]));
-                snd_play(snd_menumove);
-            }
-            break;
-        case 11:
-            if (step != 0)
-            {
-                global.mercymod[e] = clamp(global.mercymod[e] + step * (big ? 100 : 10), 0, drc_en_mercymax(e));
-                snd_play(snd_menumove);
-            }
-            break;
-        case 12:
-            if (ok || step != 0)
-            {
-                global.monsterstatus[e] = (global.monsterstatus[e] == 1) ? 0 : 1;
-                snd_play(snd_select);
-            }
-            break;
-    }
-    global.drcheat_ensel = r;
-    if (drc_msgtime > 0)
-        drc_msgtime--;
-    exit;
+    global.drcheat_sel = (global.drcheat_sel + 1) mod n;
+    snd_play(snd_menumove);
 }
 
 // selected party member (skip empty slots)
@@ -413,40 +184,24 @@ if (global.char[slot] <= 0)
     slot = 0;
 var ch = global.char[slot];
 
-var _sel = global.drcheat_sel;
-if (_sel == drc_row_speed)
+var row = drc_rows[clamp(global.drcheat_sel, 0, n - 1)];
+switch (row.key)
 {
-    if (ok || step != 0)
-    {
-        var _ns = array_length(drc_speed_mults);
-        global.drcheat_speed = (global.drcheat_speed + (step < 0 ? _ns - 1 : 1)) mod _ns;
-        snd_play(snd_select);
-    }
-    _sel = -1;
-}
-else if (_sel > drc_row_speed)
-    _sel--;
-if (_sel == drc_row_puzzle)
-{
-    if (ok || step != 0)
-    {
-        global.drcheat_puzzlet = (global.drcheat_puzzlet + (step < 0 ? 2 : 1)) mod 3;
-        snd_play(snd_select);
-    }
-    _sel = -1;
-}
-else if (_sel > drc_row_puzzle)
-    _sel--;
-switch (_sel)
-{
-    case 0:
+    case "page":
         if (ok)
         {
-            global.drcheat_page = 5;
+            var _pg = drc_pages[row.page];
+            if (_pg.why == "")
+                global.drcheat_page = row.page;
+            else
+            {
+                drc_msg = _pg.why;
+                drc_msgtime = 60;
+            }
             snd_play(snd_select);
         }
         break;
-    case 1:
+    case "heal":
         if (ok)
         {
             for (var i = 0; i < 3; i++)
@@ -457,19 +212,34 @@ switch (_sel)
             drc_msg = "Party healed"; drc_msgtime = 60; snd_play(snd_select);
         }
         break;
-    case 2:
+    case "filltp":
         if (ok && _hastp) { global.tension = global.maxtension; drc_msg = "TP filled"; drc_msgtime = 60; snd_play(snd_select); }
         break;
-    case 3:
+    case "lockhp":
         if (ok || step != 0) { global.drcheat_lockhp = !global.drcheat_lockhp; snd_play(snd_select); }
         break;
-    case 4:
+    case "nodmg":
         if (ok || step != 0) { global.drcheat_nodmg = !global.drcheat_nodmg; snd_play(snd_select); }
         break;
-    case 5:
+    case "inftp":
         if (ok || step != 0) { global.drcheat_inftp = !global.drcheat_inftp; snd_play(snd_select); }
         break;
-    case 6:
+    case "puzzle":
+        if (ok || step != 0)
+        {
+            global.drcheat_puzzlet = (global.drcheat_puzzlet + (step < 0 ? 2 : 1)) mod 3;
+            snd_play(snd_select);
+        }
+        break;
+    case "speed":
+        if (ok || step != 0)
+        {
+            var _ns = array_length(drc_speed_mults);
+            global.drcheat_speed = (global.drcheat_speed + (step < 0 ? _ns - 1 : 1)) mod _ns;
+            snd_play(snd_select);
+        }
+        break;
+    case "char":
         if (step != 0)
         {
             for (var k = 0; k < 3; k++)
@@ -481,16 +251,16 @@ switch (_sel)
             snd_play(snd_menumove);
         }
         break;
-    case 7:
+    case "at":
         if (step != 0 && ch > 0) { global.at[ch] = max(0, global.at[ch] + step * (big ? 10 : 1)); snd_play(snd_menumove); }
         break;
-    case 8:
+    case "df":
         if (step != 0 && ch > 0) { global.df[ch] = max(0, global.df[ch] + step * (big ? 10 : 1)); snd_play(snd_menumove); }
         break;
-    case 9:
+    case "mag":
         if (step != 0 && ch > 0) { global.mag[ch] = max(0, global.mag[ch] + step * (big ? 10 : 1)); snd_play(snd_menumove); }
         break;
-    case 10:
+    case "maxhp":
         if (step != 0 && ch > 0)
         {
             global.maxhp[ch] = max(1, global.maxhp[ch] + step * (big ? 100 : 10));
@@ -498,39 +268,7 @@ switch (_sel)
             snd_play(snd_menumove);
         }
         break;
-    case 11:
-        if (ok)
-        {
-            global.drcheat_page = 1;
-            snd_play(snd_select);
-        }
-        break;
-    case 12:
-        if (ok)
-        {
-            global.drcheat_page = 2;
-            snd_play(snd_select);
-        }
-        break;
-    case 13:
-        if (ok)
-        {
-            if (drc_rec_count > 0) global.drcheat_page = 4;
-            else { drc_msg = "Recruits begin in Chapter 2"; drc_msgtime = 60; }
-            snd_play(snd_select);
-        }
-        break;
-    case 14:
-        if (ok && drc_has_tv)
-        {
-            global.drcheat_page = 3;
-            snd_play(snd_select);
-        }
-        else if (ok) drc_close();
-        break;
-    case 15:
+    case "close":
         if (ok) drc_close();
         break;
 }
-if (drc_msgtime > 0)
-    drc_msgtime--;

@@ -221,7 +221,7 @@ What it does (`gml_GlobalScript_scr_wincombat.gml`, ch4 lines 1-54):
 `obj_rouxls_enemy_Step_0:420`, ch3 `obj_tvturnoff_manager`, ch3 `obj_tenna_board4_enemy`, ch4
 `obj_guei_enemy_Step_0:656`, ch4 `obj_elnina_lanino_rematch_controller`, ch5 `obj_aqua_enemy`
 and ch5 `obj_ball_enemy`. Reuse the existing `scr_drcheat_nospare()` list: refuse the action if
-any living enemy is on it, as `drc_en_nospare` already does in `obj_drcheat_Create_0.gml:264-276`.
+any living enemy is on it, as `drc_en_nospare` already does in `gml_GlobalScript_scr_drcheat_page_enemies.gml:17-26`.
 Also refuse when `global.specialbattle != 0`.
 
 ### Forcing an encounter

@@ -14,11 +14,17 @@ draw_set_color(c_black);
 draw_rectangle(cx, cy, cx + cw, cy + chh, false);
 draw_set_alpha(1);
 
-// box
+// box: tall enough for the main rows, but never taller than the screen (the main page scrolls
+// when its rows don't fit; with a 480-pixel GUI that is 14 rows)
+var rh = 26;
 var bw = 420;
-var bh = 466 + (array_length(drc_rows) - 14) * 26;
+var bh = min(466 + (array_length(drc_rows) - 14) * rh, chh - 16);
 var bx = cx + (cw - bw) / 2;
 var by = cy + (chh - bh) / 2;
+drc_bx = bx;
+drc_by = by;
+drc_bw = bw;
+drc_bh = bh;
 draw_set_color(c_black);
 draw_rectangle(bx, by, bx + bw, by + bh, false);
 draw_set_color(c_white);
@@ -28,210 +34,14 @@ for (var t = 0; t < 3; t++)
 scr_84_set_draw_font("main");
 draw_sprite(spr_drcheat_icon, 0, bx + 28, by + 26);
 
-if (global.drcheat_page == 1)
+// ---- sub page: its own script draws title, rows and footer
+if (global.drcheat_page != 0)
 {
-    draw_text(bx + 50, by + 12, "INVENTORY");
-    var cat = clamp(global.drcheat_invcat, 0, 3);
-    var ns = drc_inv_slots(cat);
-    var r = global.drcheat_invsel;
-    var rx = bx + 50;
-    var ry = by + 48;
-    var rh = 26;
-    draw_set_color((r == -1) ? c_yellow : c_white);
-    draw_text(rx, ry, "< " + drc_inv_cats[cat] + " >");
-    if (r == -1)
-        draw_sprite(spr_heart, 0, rx - 26, ry + 8);
-    var vis = 12;
-    var top = clamp(r - 5, 0, max(0, ns - vis));
-    for (var i = 0; i < vis && top + i < ns; i++)
-    {
-        var si = top + i;
-        var y0 = ry + 34 + i * rh;
-        var idv = drc_inv_ready ? drc_inv_get(cat, si) : 0;
-        draw_set_color((si == r) ? c_yellow : ((idv == 0) ? c_gray : c_white));
-        draw_text(rx, y0, string(si + 1));
-        draw_text(rx + 40, y0, drc_inv_ready ? drc_inv_name(cat, idv) : "...");
-        if (si == r)
-            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
-    }
-    draw_set_color(c_gray);
-    if (top > 0)
-        draw_text(bx + bw - 40, ry + 34, "^");
-    if (top + vis < ns)
-        draw_text(bx + bw - 40, ry + 34 + (vis - 1) * rh, "v");
-    if (variable_global_exists("darkzone") && !global.darkzone)
-        draw_text(bx + 20, by + bh - 60, "(Light World items aren't listed)");
-    draw_text(bx + 20, by + bh - 34, "</> item  SHIFT x5  DEL clear  X back");
-    draw_set_color(c_white);
+    drc_page_call("draw");
     exit;
 }
 
-if (global.drcheat_page == 5)
-{
-    draw_text(bx + 50, by + 12, "MONEY");
-    var rx = bx + 50;
-    var vx = bx + 250;
-    var ry = by + 48;
-    var rh = 26;
-    var nr = array_length(drc_money_rows);
-    var r = clamp(global.drcheat_monsel, 0, max(0, nr - 1));
-    for (var i = 0; i < nr; i++)
-    {
-        var _m = drc_money_rows[i];
-        var y0 = ry + i * rh;
-        draw_set_color((i == r) ? c_yellow : c_white);
-        draw_text(rx, y0, drc_money[_m].name);
-        draw_text(vx, y0, "< " + string(drc_money_get(_m)) + " >");
-        if (i == r)
-            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
-    }
-    draw_set_color(c_gray);
-    var ty = ry + nr * rh + 10;
-    if (nr > 0)
-    {
-        draw_text(rx - 20, ty, drc_money[drc_money_rows[r]].note);
-        ty += 34;
-    }
-    // Ch5 before the F$ reveal (flag 1412 == 1, read only): the money box adds F$ to the D$ figure
-    if (global.chapter == 5 && array_length(global.flag) > drc_money_noflag && global.flag[drc_money_noflag] == 1)
-    {
-        draw_text(rx - 20, ty, "The money box shows D$ + F$ for now,");
-        draw_text(rx - 20, ty + 24, "but D$ shops only take the D$ row.");
-    }
-    // footer: the selected row's own steps from the table
-    var _st = (nr > 0) ? drc_money[drc_money_rows[r]] : { step: 10, big: 1000 };
-    draw_text(bx + 20, by + bh - 34, "</> +/-" + string(_st.step) + "  SHIFT +/-" + string(_st.big) + "  X back");
-    draw_set_color(c_white);
-    exit;
-}
-
-if (global.drcheat_page == 4)
-{
-    draw_text(bx + 50, by + 12, "RECRUITS");
-    var rx = bx + 50;
-    var ry = by + 48;
-    var rh = 26;
-    var vis = 12;
-    var top = clamp(global.drcheat_recsel - 5, 0, max(0, drc_rec_count - vis));
-    for (var i = 0; i < vis && top + i < drc_rec_count; i++)
-    {
-        var r = top + i;
-        var y0 = ry + i * rh;
-        var val = drc_rec_current(r);
-        draw_set_color(r == global.drcheat_recsel ? c_yellow : (val < 0 ? c_gray : c_white));
-        draw_text(rx, y0, drc_rec_names[r]);
-        draw_text(bx + 290, y0, val < 0 ? "LOST" : string(val) + "/" + string(drc_rec_max[r]));
-        if (r == global.drcheat_recsel)
-            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
-    }
-    draw_set_color(c_gray);
-    if (top > 0) draw_text(bx + bw - 40, ry, "^");
-    if (top + vis < drc_rec_count) draw_text(bx + bw - 40, ry + (vis - 1) * rh, "v");
-    draw_text(bx + 20, by + bh - 60, "LOST: this recruit was defeated.");
-    draw_text(bx + 20, by + bh - 34, "</> +/-1  SHIFT x5  C reset  X back");
-    draw_set_color(c_white);
-    exit;
-}
-
-if (global.drcheat_page == 3)
-{
-    draw_text(bx + 50, by + 12, "TV SHOW");
-    var rx = bx + 50;
-    var vx = bx + 250;
-    var ry = by + 48;
-    var rh = 26;
-    for (var i = 0; i < array_length(drc_tv_rows); i++)
-    {
-        var y0 = ry + i * rh;
-        var v = "";
-        if (i == 0)
-            v = "< " + string(global.flag[1044]) + " >";
-        else if (i == 3)
-            v = global.drcheat_mgassist ? "ON" : "OFF";
-        else if (i == 4)
-            v = global.drcheat_mgmax ? "on close" : "Z";
-        else
-            v = "< " + drc_tv_letters[clamp(global.flag[(i == 1) ? 1173 : 1174], 0, 5)] + " >";
-        draw_set_color((i == global.drcheat_tvsel) ? c_yellow : c_white);
-        draw_text(rx, y0, drc_tv_rows[i]);
-        draw_text(vx, y0, v);
-        if (i == global.drcheat_tvsel)
-            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
-    }
-    draw_set_color(c_gray);
-    var ty = ry + 6 * rh;
-    draw_text(rx - 20, ty, "Ranks: saved board result; they open");
-    draw_text(rx - 20, ty + 24, "the ranking room doors and T-Rank room.");
-    draw_text(rx - 20, ty + 56, "Minigames: cooking show, rhythm game,");
-    draw_text(rx - 20, ty + 80, "Susiezilla. Assist = can't lose.");
-    draw_text(rx - 20, ty + 104, "Top score: open F7 during the game.");
-    if (drc_msgtime > 0)
-    {
-        draw_set_color(c_lime);
-        draw_text(vx, by + 12, drc_msg);
-        draw_set_color(c_gray);
-    }
-    draw_text(bx + 20, by + bh - 34, "</> change  SHIFT x10  X back");
-    draw_set_color(c_white);
-    exit;
-}
-
-if (global.drcheat_page == 2)
-{
-    draw_text(bx + 50, by + 12, "ENEMIES");
-    var rows = drc_en_rows();
-    var r = global.drcheat_ensel;
-    var rx = bx + 50;
-    var vx = bx + 250;
-    var ry = by + 48;
-    var rh = 26;
-    var fight = drc_in_battle();
-    var yy = ry;
-    for (var i = 0; i < array_length(rows); i++)
-    {
-        var kind = rows[i][0];
-        var e = rows[i][1];
-        if (kind == 10)
-        {
-            // enemy header line before its HP row
-            yy += 6;
-            draw_set_color(c_aqua);
-            draw_text(rx - 10, yy, drc_en_name(e) + (drc_en_nospare(e) ? "  (can't be spared)" : ""));
-            yy += rh;
-        }
-        var lab = "";
-        var v = "";
-        switch (kind)
-        {
-            case 0: lab = "Auto mercy"; v = global.drcheat_automercy ? "ON" : "OFF"; break;
-            case 1: lab = "All: can spare"; break;
-            case 2: lab = "All: HP 1"; break;
-            case 10: lab = "HP"; v = "< " + string(global.monsterhp[e]) + " > / " + string(global.monstermaxhp[e]); break;
-            case 11: lab = "Mercy"; v = "< " + string(global.mercymod[e]) + "% >"; break;
-            case 12: lab = "Tired"; v = (global.monsterstatus[e] == 1) ? "YES" : "NO"; break;
-        }
-        var off = (kind == 1 || kind == 2) && !fight;
-        draw_set_color((i == r) ? c_yellow : (off ? c_gray : c_white));
-        draw_text(rx + ((kind >= 10) ? 16 : 0), yy, lab);
-        draw_text(vx, yy, v);
-        if (i == r)
-            draw_sprite(spr_heart, 0, rx - 26, yy + 8);
-        yy += rh;
-    }
-    draw_set_color(c_gray);
-    if (!fight)
-        draw_text(rx, yy + 10, "(not in a battle)");
-    draw_set_color(c_gray);
-    draw_text(bx + 20, by + bh - 34, "Z/</> change  SHIFT x10  X back");
-    if (drc_msgtime > 0)
-    {
-        draw_set_color(c_lime);
-        draw_text(vx, by + 12, drc_msg);
-    }
-    draw_set_color(c_white);
-    exit;
-}
-
+// ---- main page
 draw_text(bx + 50, by + 12, "CHEATS");
 
 var slot = clamp(global.drcheat_slot, 0, 2);
@@ -243,44 +53,39 @@ var hastp = variable_global_exists("tension") && variable_global_exists("maxtens
 var rx = bx + 50;
 var vx = bx + 250;
 var ry = by + 48;
-var rh = 26;
-for (var i = 0; i < array_length(drc_rows); i++)
+var n = array_length(drc_rows);
+var vis = min(n, floor((bh - 88) / rh));
+var top = drc_list_top(global.drcheat_sel, n, vis);
+for (var j = 0; j < vis; j++)
 {
-    var y0 = ry + i * rh;
+    var i = top + j;
+    var row = drc_rows[i];
+    var y0 = ry + j * rh;
     var sel = (i == global.drcheat_sel);
     draw_set_color(sel ? c_yellow : c_white);
-    if ((i == 2 || i == 5) && !hastp)
+    if ((row.key == "filltp" || row.key == "inftp") && !hastp)
         draw_set_color(c_gray);
-    draw_text(rx, y0, drc_rows[i]);
+    draw_text(rx, y0, row.label);
     var v = "";
-    var _ri = (i > drc_row_puzzle) ? i - 1 : i;
-    if (i > drc_row_speed) _ri--;
-    if (i == drc_row_speed) { v = drc_speed_names[clamp(global.drcheat_speed, 0, array_length(drc_speed_names) - 1)]; _ri = -1; }
-    if (i == drc_row_puzzle)
+    switch (row.key)
     {
-        v = (global.drcheat_puzzlet == 2) ? "FROZEN" : ((global.drcheat_puzzlet == 1) ? "SLOW x3" : "OFF");
-        _ri = -1;
-    }
-    switch (_ri)
-    {
-        case 0: v = ">"; break;
-        case 3: v = global.drcheat_lockhp ? "ON" : "OFF"; break;
-        case 4: v = global.drcheat_nodmg ? "ON" : "OFF"; break;
-        case 5: v = global.drcheat_inftp ? "ON" : "OFF"; break;
-        case 6: v = "< " + nm + " >"; break;
-        case 7: v = (ch > 0) ? ("< " + string(global.at[ch]) + " >") : "-"; break;
-        case 8: v = (ch > 0) ? ("< " + string(global.df[ch]) + " >") : "-"; break;
-        case 9: v = (ch > 0) ? ("< " + string(global.mag[ch]) + " >") : "-"; break;
-        case 10: v = (ch > 0) ? ("< " + string(global.maxhp[ch]) + " >  HP " + string(global.hp[ch])) : "-"; break;
-        case 11: v = ">"; break;
-        case 12: v = ">"; break;
-        case 13: v = drc_rec_count > 0 ? ">" : "-"; break;
-        case 14: v = drc_has_tv ? ">" : ""; break;
+        case "page": v = (drc_pages[row.page].why == "") ? ">" : "-"; break;
+        case "lockhp": v = global.drcheat_lockhp ? "ON" : "OFF"; break;
+        case "nodmg": v = global.drcheat_nodmg ? "ON" : "OFF"; break;
+        case "inftp": v = global.drcheat_inftp ? "ON" : "OFF"; break;
+        case "puzzle": v = (global.drcheat_puzzlet == 2) ? "FROZEN" : ((global.drcheat_puzzlet == 1) ? "SLOW x3" : "OFF"); break;
+        case "speed": v = drc_speed_names[clamp(global.drcheat_speed, 0, array_length(drc_speed_names) - 1)]; break;
+        case "char": v = "< " + nm + " >"; break;
+        case "at": v = (ch > 0) ? ("< " + string(global.at[ch]) + " >") : "-"; break;
+        case "df": v = (ch > 0) ? ("< " + string(global.df[ch]) + " >") : "-"; break;
+        case "mag": v = (ch > 0) ? ("< " + string(global.mag[ch]) + " >") : "-"; break;
+        case "maxhp": v = (ch > 0) ? ("< " + string(global.maxhp[ch]) + " >  HP " + string(global.hp[ch])) : "-"; break;
     }
     draw_text(vx, y0, v);
     if (sel)
         draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
 }
+drc_draw_more(ry, ry + (vis - 1) * rh, top > 0, top + vis < n);
 draw_set_color(c_gray);
 draw_text(bx + 20, by + bh - 34, "Z select  </> change  SHIFT x10  X/F7 close");
 if (drc_msgtime > 0)

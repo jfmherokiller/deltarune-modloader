@@ -80,7 +80,7 @@ BepInEx sits on top of its runtime libraries.
 ## Done (2026-11-13)
 
 - **CheatMenu Money page (task 27).** F7 → **Money...** replaces the Gold row. The rows come
-  from the `drc_money` table in `obj_drcheat` Create: D$ (`global.gold`), Light World $
+  from the `drc_money` table (now in `scr_drcheat_page_money`): D$ (`global.gold`), Light World $
   (`global.lgold`), PT (`flag[1044]`, Ch3–4, 0..9999), Board points (`flag[1117]`, Ch3), F$
   (`flag[1411]`, Ch5) and P$ (`flag[1312]`, Ch5). Rows from other chapters are hidden. The page
   never writes the Ch5 F$ reveal state `flag[1412]`. Verified in-game under Proton, with a

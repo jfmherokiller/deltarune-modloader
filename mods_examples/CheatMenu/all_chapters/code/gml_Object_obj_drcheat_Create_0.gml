@@ -1,5 +1,21 @@
 // CheatMenu: F7 opens a paused cheat overlay (overworld and battle).
 // State lives in globals so it survives room changes (this object is re-spawned by obj_time).
+//
+// This object holds the page registry, page switching, shared helpers and the main page.
+// Every other page is one global script, scr_drcheat_page_<name>(_mode), called with
+// self = this instance (so its drc_* variables live here). Modes:
+//   "init"    from Create: set up the page's state. Return { label, why } for its row on the main
+//             page (why != "" shows the row as "-" and Z prints why instead of opening it), or
+//             undefined to leave the page out of this chapter.
+//   "tick"    every step while the menu is closed (always-on cheats).
+//   "opened"  the step the menu opens, before the game's instances are deactivated.
+//   "step"    every step while the page is shown. Input: drc_step (-1/0/1, </> with key repeat),
+//             drc_big (Shift held), drc_ok (Z/Enter pressed).
+//   "draw"    Draw GUI while the page is shown. Box: drc_bx, drc_by, drc_bw, drc_bh. The page draws
+//             its title at (drc_bx + 50, drc_by + 12), its rows from drc_by + 48 and its footer at
+//             drc_by + drc_bh - 34. drc_list_top / drc_draw_more scroll long lists.
+//   "leave"   leaving the page (X back to the main page, or closing the menu).
+// A new page = one new script + one drc_page_add line below.
 depth = -99999;
 if (!variable_global_exists("drcheat_open"))
 {
@@ -9,258 +25,67 @@ if (!variable_global_exists("drcheat_open"))
     global.drcheat_nodmg = 0;
     global.drcheat_inftp = 0;
 }
-if (!variable_global_exists("drcheat_automercy"))
-{
-    global.drcheat_automercy = 0;
-    global.drcheat_ensel = 0;
-}
 // glow-tile puzzle timers (Ch1/3 obj_glowtilepuzz, Ch5 obj_glowtile_puzzle_new): 0 off, 1 slow x3, 2 frozen
 if (!variable_global_exists("drcheat_puzzlet"))
     global.drcheat_puzzlet = 0;
 drc_ptick = 0;
-drc_row_puzzle = 6;   // rows after this one keep their old switch numbers (see Step/Draw)
-if (!variable_global_exists("drcheat_invcat"))
-{
-    global.drcheat_invcat = 0;
-    global.drcheat_invsel = -1;
-}
 global.drcheat_open = 0;   // a fresh instance never starts inside an open menu
-global.drcheat_page = 0;   // 0 main, 1 inventory, 2 enemies, 3 TV show, 4 recruits, 5 money
+global.drcheat_page = 0;   // 0 main page, else an index into drc_pages
 drc_shot = -1;
 drc_hold = 0;
 drc_msg = "";
 drc_msgtime = 0;
 drc_names = ["?", "Kris", "Susie", "Ralsei", "Noelle"];
-drc_rows = ["Money...", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Puzzle timer", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "Close"];
-// Chapter 3 only: TV show page (points + saved board rankings)
-drc_has_tv = global.chapter == 3;
-if (drc_has_tv)
-    drc_rows = ["Money...", "Heal party", "Fill TP", "Lock HP", "No damage", "Infinite TP", "Puzzle timer", "Character", "AT", "DF", "MAG", "Max HP", "Inventory...", "Enemies...", "Recruits...", "TV Show...", "Close"];
-global.drcheat_tvsel = 0;
-// flag 1044 = points (PTs), 1173/1174 = saved rank of board 1/2 (0 Z, 1 C, 2 B, 3 A, 4 S, 5 T).
-// The ranks unlock the ranking-room doors (A>=3, B>=2, C>=1) and the T-rank room (5).
-drc_tv_letters = ["Z", "C", "B", "A", "S", "T"];
-drc_tv_rows = ["Points", "Board 1 rank", "Board 2 rank", "Minigame assist", "Minigame: top score"];
-if (!variable_global_exists("drcheat_mgassist"))
-    global.drcheat_mgassist = 0;
-global.drcheat_mgmax = 0;   // pending "top score"; applied after closing (minigame objects are frozen while open)
+// input for the page scripts (set by Step each step while the menu is open)
+drc_step = 0;
+drc_big = 0;
+drc_ok = 0;
+// menu box (set by Draw GUI each frame)
+drc_bx = 0;
+drc_by = 0;
+drc_bw = 420;
+drc_bh = 466;
 
-// ---- money page: one table entry per currency, so a new currency is one more line.
-// name     row label             ch0/ch1  first/last chapter the row is shown in (hidden elsewhere)
-// store    a string = global variable name, a number = global.flag index
-// lo/hi    clamp range for writes   step/big  </> step, and the step with Shift held
-// note     help line under the rows
-//
-// FLAG 1412 RESTRICTION (Chapter 5): global.flag[1412] is the Flowery Dollar reveal state
-// (0 none taken, 1 shown as D$ = gold + F$ by obj_darkcontroller_Draw_0, 2 shown on its own F$
-// line; obj_dw_garden_enemyrush_Other_14 drives it). It is story state, not money: changing it
-// desyncs the F$ reveal scene and the money box. It must NEVER be written. It is not a table
-// entry, rows pointing at it are dropped below, and drc_money_set refuses it. The balances
-// themselves are F$ = flag[1411] and P$ = flag[1312], which are safe to edit.
-drc_money_noflag = 1412;
-drc_money = [
-    { name: "D$",            ch0: 1, ch1: 5, store: "gold",  lo: 0, hi: 99999, step: 10, big: 1000, note: "Dark World shops" },
-    { name: "Light World $", ch0: 1, ch1: 5, store: "lgold", lo: 0, hi: 99999, step: 10, big: 1000, note: "Light World shops" },
-    // same 0..9999 range as the TV Show page's PT row
-    { name: "PT",            ch0: 3, ch1: 4, store: 1044,    lo: 0, hi: 9999,  step: 10, big: 100,  note: "TV points (Ch4: Gerson's table)" },
-    { name: "Board points",  ch0: 3, ch1: 3, store: 1117,    lo: 0, hi: 99999, step: 10, big: 100,  note: "Score of the current board" },
-    { name: "F$",            ch0: 5, ch1: 5, store: 1411,    lo: 0, hi: 99999, step: 10, big: 1000, note: "Flowery Dollars" },
-    { name: "P$",            ch0: 5, ch1: 5, store: 1312,    lo: 0, hi: 99999, step: 10, big: 1000, note: "Pink Dollars" }
-];
-if (!variable_global_exists("drcheat_monsel"))
-    global.drcheat_monsel = 0;
-// table indices valid in this chapter (the others are hidden)
-drc_money_rows = [];
-for (var _m = 0; _m < array_length(drc_money); _m++)
-{
-    var _e = drc_money[_m];
-    var _s = _e.store;
-    if (global.chapter < _e.ch0 || global.chapter > _e.ch1)
-        continue;
-    if (is_string(_s) ? !variable_global_exists(_s) : (_s == drc_money_noflag || _s >= array_length(global.flag)))
-        continue;
-    array_push(drc_money_rows, _m);
-}
-drc_money_get = function(_m)
-{
-    var _s = drc_money[_m].store;
-    var _v = is_string(_s) ? variable_global_get(_s) : global.flag[_s];
-    return is_real(_v) ? _v : 0;
-};
-drc_money_set = function(_m, _v)
-{
-    var _e = drc_money[_m];
-    var _s = _e.store;
-    // clamp to lo..hi, but never lower a value the game already put above hi (Ch5 saves can hold
-    // more than 99999 D$), so pressing right at the cap does not take money away
-    var _old = drc_money_get(_m);
-    _v = max(_e.lo, round(_v));
-    if (_v > _e.hi)
-        _v = max(_e.hi, min(_v, _old));
-    if (is_string(_s))
-        variable_global_set(_s, _v);
-    else if (_s != drc_money_noflag)   // flag 1412 restriction (see above): never written
-        global.flag[_s] = _v;
-};
-
-// Recruitment is stored as global.flag[600 + enemy ID] = recruited / required.
-// Use the same per-type IDs as the game's chapter recruit lists; do not include bosses.
-if (!variable_global_exists("drcheat_recsel")) global.drcheat_recsel = 0;
-drc_rec_ids = [];
-if (global.chapter >= 2)
-{
-    drc_rec_ids = [5, 6, 11, 13, 14, 15, 22, 23];
-    var _ids = [30, 31, 32, 33, 34, 35, 36, 40, 42, 44];
-    for (var _i = 0; _i < array_length(_ids); _i++)
-        array_push(drc_rec_ids, _ids[_i]);
-    if (global.chapter >= 3)
-    {
-        var _ids = [54, 55, 56, 57, 58, 59, 60, 61];
-        for (var _i = 0; _i < array_length(_ids); _i++)
-            array_push(drc_rec_ids, _ids[_i]);
-    }
-    if (global.chapter >= 4)
-    {
-        var _ids = [62, 63, 64, 65, 66, 67, 68, 69];
-        for (var _i = 0; _i < array_length(_ids); _i++)
-            array_push(drc_rec_ids, _ids[_i]);
-    }
-    if (global.chapter >= 5)
-    {
-        var _ids = [70, 71, 72, 73, 74, 75, 76, 77];
-        for (var _i = 0; _i < array_length(_ids); _i++)
-            array_push(drc_rec_ids, _ids[_i]);
-    }
-}
-drc_rec_count = array_length(drc_rec_ids);
-drc_rec_names = [];
-drc_rec_max = [];
-for (var _r = 0; _r < drc_rec_count; _r++)
-{
-    var _info = scr_drcheat_recruit_info(drc_rec_ids[_r]);
-    drc_rec_names[_r] = _info[0];
-    drc_rec_max[_r] = max(1, _info[1]);
-}
-drc_rec_current = function(_r)
-{
-    var _v = global.flag[600 + drc_rec_ids[_r]];
-    if (_v < 0) return -1; // the game marks lost recruits with -1
-    return clamp(round(_v * drc_rec_max[_r]), 0, drc_rec_max[_r]);
-};
-
-// ---- walk speed (ROADMAP 28): multiplier row after "Puzzle timer". The row is inserted here
-// so drc_rows stays one list; Step/Draw shift the rows after it back to their old numbers.
-// Applied every step by scr_drcheat_speed_apply (scales obj_mainchara.bwspeed, restores it at x1).
+// ---- walk speed (ROADMAP 28): applied every step by scr_drcheat_speed_apply
+// (scales obj_mainchara.bwspeed, restores it at x1)
 if (!variable_global_exists("drcheat_speed"))
     global.drcheat_speed = 0;   // index into drc_speed_mults; 0 = off (vanilla)
 drc_speed_mults = [1, 1.5, 2, 3];
 drc_speed_names = ["OFF", "x1.5", "x2", "x3"];
-drc_row_speed = drc_row_puzzle + 1;
-array_insert(drc_rows, drc_row_speed, "Walk speed");
 
-// ---- inventory editor (dark world inventory: items, weapons, armor, key items)
-drc_inv_cats = ["Items", "Weapons", "Armor", "Key Items"];
-drc_inv_ready = 0;
-drc_inv_ids = [];   // per category: valid ids, [0, ...] (0 = empty slot)
-drc_inv_nm = [];    // per category: name by id
-// item name via the game's own info scripts (they set these vars on self)
-drc_inv_lookup = function(_cat, _id)
+// ---- shared helpers
+// first visible row of a scrolled list: keeps the cursor about in the middle
+drc_list_top = function(_sel, _n, _vis)
 {
-    switch (_cat)
-    {
-        case 0: scr_iteminfo(_id); return itemnameb;
-        case 1: scr_weaponinfo(_id); return weaponnametemp;
-        case 2: scr_armorinfo(_id); return armornametemp;
-        case 3: scr_keyiteminfo(_id); return tempkeyitemname;
-    }
-    return "";
+    return clamp(_sel - ((_vis - 1) div 2), 0, max(0, _n - _vis));
 };
-drc_inv_build = function()
+// "more above / more below" markers at the right edge of a list (_y0 first row, _y1 last row)
+drc_draw_more = function(_y0, _y1, _up, _down)
 {
-    drc_inv_ids = [[0], [0], [0], [0]];
-    drc_inv_nm = [[], [], [], []];
-    for (var _c = 0; _c < 4; _c++)
-    {
-        for (var _i = 1; _i < 100; _i++)
-        {
-            var _nm = drc_inv_lookup(_c, _i);
-            if (is_string(_nm) && string_replace_all(_nm, " ", "") != "" && _nm != "---")
-            {
-                array_push(drc_inv_ids[_c], _i);
-                drc_inv_nm[_c][_i] = _nm;
-            }
-        }
-    }
-    drc_inv_ready = 1;
+    var _x = drc_bx + drc_bw - 34;
+    draw_set_color(c_gray);
+    if (_up)
+        draw_triangle(_x, _y0 + 16, _x + 12, _y0 + 16, _x + 6, _y0 + 6, false);
+    if (_down)
+        draw_triangle(_x, _y1 + 6, _x + 12, _y1 + 6, _x + 6, _y1 + 16, false);
 };
-drc_inv_name = function(_cat, _id)
+// the open menu deactivates every instance, so remember whether a battle was running when it opened
+drc_battle_open = 0;
+drc_in_battle = function()
 {
-    if (_id <= 0)
-        return "-";
-    var _a = drc_inv_nm[_cat];
-    if (_id < array_length(_a) && is_string(_a[_id]))
-        return _a[_id];
-    return "#" + string(_id);
-};
-// slot counts: items 12, weapons/armor 12 in Ch1 and 48 after, key items 12
-drc_inv_slots = function(_cat)
-{
-    switch (_cat)
-    {
-        case 0: return min(12, array_length(global.item));
-        case 1: return min((global.chapter <= 1) ? 12 : 48, array_length(global.weapon));
-        case 2: return min((global.chapter <= 1) ? 12 : 48, array_length(global.armor));
-        case 3: return min(12, array_length(global.keyitem));
-    }
-    return 0;
-};
-// direct global writes (a local copy of a global array would copy-on-write)
-drc_inv_get = function(_cat, _i)
-{
-    switch (_cat)
-    {
-        case 0: return global.item[_i];
-        case 1: return global.weapon[_i];
-        case 2: return global.armor[_i];
-        case 3: return global.keyitem[_i];
-    }
-    return 0;
-};
-drc_inv_set = function(_cat, _i, _v)
-{
-    switch (_cat)
-    {
-        case 0: global.item[_i] = _v; break;
-        case 1: global.weapon[_i] = _v; break;
-        case 2: global.armor[_i] = _v; break;
-        case 3: global.keyitem[_i] = _v; break;
-    }
-};
-// the game's menus stop at the first empty slot, so close gaps when leaving the page
-drc_inv_compact = function()
-{
-    for (var _c = 0; _c < 4; _c++)
-    {
-        var _n = drc_inv_slots(_c);
-        var _w = 0;
-        for (var _i = 0; _i < _n; _i++)
-        {
-            var _v = drc_inv_get(_c, _i);
-            if (_v != 0)
-            {
-                drc_inv_set(_c, _w, _v);
-                _w++;
-            }
-        }
-        for (var _i = _w; _i < _n; _i++)
-            drc_inv_set(_c, _i, 0);
-    }
+    if (!variable_global_exists("monster") || !variable_global_exists("mercymod"))
+        return 0;
+    return global.drcheat_open ? drc_battle_open : instance_exists(obj_battlecontroller);
 };
 drc_frozen = [];
+drc_page_call = function(_mode)
+{
+    if (global.drcheat_page > 0 && global.drcheat_page < array_length(drc_pages))
+        script_execute(drc_pages[global.drcheat_page].scr, _mode);
+};
 drc_close = function()
 {
-    if (global.drcheat_page == 1)
-        drc_inv_compact();
+    drc_page_call("leave");
     global.drcheat_page = 0;
     for (var i = 0; i < array_length(drc_frozen); i++)
         instance_activate_object(drc_frozen[i]);
@@ -273,74 +98,37 @@ drc_close = function()
     snd_play(snd_smallswing);
 };
 
+// ---- page registry. drc_page_add(script, top): top = 1 puts the page's row at the top of the
+// main page, 0 at the bottom (above Close). Rows keep the order of these lines.
+drc_pages = [undefined];   // index 0 = the main page
+drc_page_add = function(_scr, _top)
+{
+    var _info = script_execute(_scr, "init");
+    if (is_undefined(_info))
+        return;
+    array_push(drc_pages, { scr: _scr, top: _top, label: _info.label, why: _info.why });
+};
+drc_page_add(scr_drcheat_page_money, 1);
+drc_page_add(scr_drcheat_page_inventory, 0);
+drc_page_add(scr_drcheat_page_enemies, 0);
+drc_page_add(scr_drcheat_page_recruits, 0);
+drc_page_add(scr_drcheat_page_tv, 0);   // Chapter 3 only
 
-// ---- enemy editor (battle only): the 3 enemy slots live in global.monster* arrays
-// the open menu deactivates every instance, so remember whether a battle was running when it opened
-drc_battle_open = 0;
-drc_in_battle = function()
-{
-    if (!variable_global_exists("monster") || !variable_global_exists("mercymod"))
-        return 0;
-    return global.drcheat_open ? drc_battle_open : instance_exists(obj_battlecontroller);
-};
-// enemies the game never lets you spare (per chapter, generated by tools/gen_nospare.csx from the
-// game's own code: SPARE event is a no-op, mercy forced back to 0, or no way to gain mercy).
-// Forcing their spare state breaks the scripted fight (crash seen sparing Ch2 Queen).
-drc_nospare_types = scr_drcheat_nospare();
-drc_en_nospare = function(_i)
-{
-    var _t = global.monstertype[_i];
-    for (var _k = 0; _k < array_length(drc_nospare_types); _k++)
-    {
-        if (drc_nospare_types[_k] == _t)
-            return 1;
-    }
-    return 0;
-};
-drc_en_alive = function(_i)
-{
-    return global.monster[_i] == 1;
-};
-drc_en_mercymax = function(_i)
-{
-    var _m = 100;
-    if (variable_global_exists("mercymax") && is_real(global.mercymax[_i]))
-        _m = max(100, global.mercymax[_i]);
-    return _m;
-};
-// the battle's SPARE / Pacify checks mercy >= mercymax and status 1 (Tired)
-drc_en_spareable = function(_i)
-{
-    global.mercymod[_i] = drc_en_mercymax(_i);
-    global.monsterstatus[_i] = 1;
-};
-// rows: [kind, enemy]; 0 auto mercy, 1 all spareable, 2 all HP 1, 10 HP, 11 mercy, 12 tired
-drc_en_rows = function()
-{
-    var _r = [[0, -1], [1, -1], [2, -1]];
-    if (drc_in_battle())
-    {
-        for (var _i = 0; _i < 3; _i++)
-        {
-            if (drc_en_alive(_i))
-            {
-                array_push(_r, [10, _i]);
-                if (!drc_en_nospare(_i))
-                {
-                    array_push(_r, [11, _i]);
-                    array_push(_r, [12, _i]);
-                }
-            }
-        }
-    }
-    return _r;
-};
-drc_en_name = function(_i)
-{
-    var _n = "";
-    if (variable_global_exists("monstername") && is_string(global.monstername[_i]))
-        _n = global.monstername[_i];
-    if (_n == "")
-        _n = "Enemy " + string(_i + 1);
-    return _n;
-};
+// ---- main page rows: { label, key }, key = a built-in row (Step/Draw switch on it) or "page"
+// (then page = its index in drc_pages)
+drc_rows = [];
+for (var _p = 1; _p < array_length(drc_pages); _p++)
+    if (drc_pages[_p].top)
+        array_push(drc_rows, { label: drc_pages[_p].label, key: "page", page: _p });
+var _main = [
+    ["Heal party", "heal"], ["Fill TP", "filltp"], ["Lock HP", "lockhp"], ["No damage", "nodmg"],
+    ["Infinite TP", "inftp"], ["Puzzle timer", "puzzle"], ["Walk speed", "speed"],
+    ["Character", "char"], ["AT", "at"], ["DF", "df"], ["MAG", "mag"], ["Max HP", "maxhp"]
+];
+for (var _i = 0; _i < array_length(_main); _i++)
+    array_push(drc_rows, { label: _main[_i][0], key: _main[_i][1], page: 0 });
+for (var _p = 1; _p < array_length(drc_pages); _p++)
+    if (!drc_pages[_p].top)
+        array_push(drc_rows, { label: drc_pages[_p].label, key: "page", page: _p });
+array_push(drc_rows, { label: "Close", key: "close", page: 0 });
+global.drcheat_sel = clamp(global.drcheat_sel, 0, array_length(drc_rows) - 1);

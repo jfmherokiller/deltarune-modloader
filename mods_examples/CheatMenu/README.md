@@ -20,6 +20,9 @@ freezes and a cheat overlay opens.
 | TV Show... | Chapter 3 only: Z opens the TV show page (below) |
 | Close | Z, X or F7 |
 
+The box never grows past the screen: when the rows don't fit (the main page in every chapter, the
+recruit list, a three-enemy battle) the list scrolls with the cursor and ▲/▼ marks the hidden rows.
+
 ### Enemy editor (battles)
 
 Open F7 during a battle, then **Enemies...**:
@@ -70,7 +73,7 @@ lowers a value the game already put above the cap. Currencies of other chapters 
 | F$ | `flag[1411]` | 5 | 10 / 1000 |
 | P$ | `flag[1312]` | 5 | 10 / 1000 |
 
-The rows come from the `drc_money` table in `obj_drcheat`'s Create event (name, chapters,
+The rows come from the `drc_money` table in `scr_drcheat_page_money` (name, chapters,
 storage, min/max, steps, help line), so a new currency is one more entry. Chapter 5's
 `flag[1412]` records whether the Flowery Dollars are shown as part of
 D$ or on their own line. It is story state, and the page never writes it. While it is 1, the money
@@ -137,6 +140,7 @@ Install: copy `CheatMenu\` into `DELTARUNE\mods\`. It needs the loader plus `mod
 Everything is in `all_chapters\`, which is applied to every `chapterN_windows\data.win`:
 
 - `code\gml_Object_obj_drcheat_*.gml`: a **new object**, created from nothing by naming its event code.
+- `code\gml_GlobalScript_scr_drcheat_page_*.gml`: **new global scripts**, one per menu page (see below).
 - `code\gml_Object_obj_time_Step_1.append.gml`: an **append patch**. It adds code to the end of the
   persistent `obj_time` step event without replacing it, so it stacks with other mods (tested
   together with LocalMultiplayer, which replaces that same script).
@@ -146,3 +150,30 @@ Everything is in `all_chapters\`, which is applied to every `chapterN_windows\da
 
 "No damage" holds `global.inv` (the invulnerability timer), the same trick as the CE table, so
 scripted hazards that bypass it still hit.
+
+## Adding a page
+
+`obj_drcheat` (Create / Step / Draw GUI) only holds the page registry, page switching, shared
+helpers, the always-on main-page cheats and the main page itself. Every other page is one global
+script, `all_chapters/code/gml_GlobalScript_scr_drcheat_page_<name>.gml`, defining
+`scr_drcheat_page_<name>(_mode)`. It runs with `self` = the `obj_drcheat` instance, so its
+`drc_*` variables and methods live there. Modes (the full contract is at the top of the Create event):
+
+| Mode | When | Does |
+|---|---|---|
+| `"init"` | Create | set up state; return `{ label, why }` for the page's main-page row (`why != ""` shows the row as `-` and Z prints `why`), or `undefined` to leave the page out of this chapter |
+| `"tick"` | every step while the menu is closed | always-on cheats (auto mercy, minigame assist) |
+| `"opened"` | the step F7 opens the menu, before the game's instances are deactivated | look at live instances |
+| `"step"` | every step while the page is shown | input: `drc_step` (-1/0/1 from ←/→ with key repeat), `drc_big` (Shift), `drc_ok` (Z/Enter) |
+| `"draw"` | Draw GUI while the page is shown | box is `drc_bx/drc_by/drc_bw/drc_bh`; title at `(drc_bx + 50, drc_by + 12)`, rows from `drc_by + 48`, footer at `drc_by + drc_bh - 34`. `drc_list_top(sel, n, visible)` and `drc_draw_more(y_first, y_last, up, down)` scroll long lists |
+| `"leave"` | X back to the main page, or closing the menu | clean up (the inventory page closes slot gaps here) |
+
+Modes a page doesn't need just fall through and return `undefined`. Then add one line to the
+registry in the Create event:
+
+```gml
+drc_page_add(scr_drcheat_page_<name>, 0);   // 1 = row at the top of the main page, 0 = at the bottom (above Close)
+```
+
+Keep a page's state in its own `drc_<prefix>_*` variables and `global.drcheat_<prefix>*` globals,
+so two pages never touch the same lines.
