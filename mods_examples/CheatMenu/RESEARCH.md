@@ -6,7 +6,7 @@ The tasks themselves are in `docs/ROADMAP.md` under "CheatMenu".
 
 ## Currencies
 
-The menu has one **Gold** row today, which only edits D$.
+The **Money...** page (ROADMAP task 27, done) edits all of these; it replaced the old **Gold** row, which only edited D$.
 
 | Currency | Shown as | Storage | Chapters | Spent at / notes |
 |---|---|---|---|---|
@@ -52,4 +52,4 @@ Replace the Gold row with a **Money...** page built from a table of entries `{na
 
 ## Already covered
 
-These are in the menu now (`README.md`): gold, heal, TP, lock HP / no damage / infinite TP, puzzle timer, party stats, inventory, enemies (HP / mercy / tired / auto mercy), recruits, and the Chapter 3 TV show.
+These are in the menu now (`README.md`): money (all currencies above), heal, TP, lock HP / no damage / infinite TP, puzzle timer, party stats, inventory, enemies (HP / mercy / tired / auto mercy), recruits, and the Chapter 3 TV show.

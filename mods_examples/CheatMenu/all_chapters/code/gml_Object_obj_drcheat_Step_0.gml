@@ -252,6 +252,26 @@ if (global.drcheat_page == 1)
 }
 
 
+// ---- money page: rows come from the drc_money table (Create), filtered to this chapter
+if (global.drcheat_page == 5)
+{
+    var nr = array_length(drc_money_rows);
+    var r = clamp(global.drcheat_monsel, 0, max(0, nr - 1));
+    if (nr > 0)
+    {
+        if (keyboard_check_pressed(vk_up)) { r = (r + nr - 1) mod nr; snd_play(snd_menumove); }
+        if (keyboard_check_pressed(vk_down)) { r = (r + 1) mod nr; snd_play(snd_menumove); }
+        if (step != 0)
+        {
+            var _m = drc_money_rows[r];
+            drc_money_set(_m, drc_money_get(_m) + step * (big ? drc_money[_m].big : drc_money[_m].step));
+            snd_play(snd_menumove);
+        }
+    }
+    global.drcheat_monsel = r;
+    exit;
+}
+
 // ---- recruit page: left/right adjusts the count; C/Del resets a lost type to zero
 if (global.drcheat_page == 4)
 {
@@ -420,7 +440,11 @@ else if (_sel > drc_row_puzzle)
 switch (_sel)
 {
     case 0:
-        if (step != 0) { global.gold = max(0, global.gold + step * (big ? 1000 : 10)); snd_play(snd_menumove); }
+        if (ok)
+        {
+            global.drcheat_page = 5;
+            snd_play(snd_select);
+        }
         break;
     case 1:
         if (ok)

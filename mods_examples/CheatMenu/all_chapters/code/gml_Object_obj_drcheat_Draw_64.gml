@@ -66,6 +66,45 @@ if (global.drcheat_page == 1)
     exit;
 }
 
+if (global.drcheat_page == 5)
+{
+    draw_text(bx + 50, by + 12, "MONEY");
+    var rx = bx + 50;
+    var vx = bx + 250;
+    var ry = by + 48;
+    var rh = 26;
+    var nr = array_length(drc_money_rows);
+    var r = clamp(global.drcheat_monsel, 0, max(0, nr - 1));
+    for (var i = 0; i < nr; i++)
+    {
+        var _m = drc_money_rows[i];
+        var y0 = ry + i * rh;
+        draw_set_color((i == r) ? c_yellow : c_white);
+        draw_text(rx, y0, drc_money[_m].name);
+        draw_text(vx, y0, "< " + string(drc_money_get(_m)) + " >");
+        if (i == r)
+            draw_sprite(spr_heart, 0, rx - 26, y0 + 8);
+    }
+    draw_set_color(c_gray);
+    var ty = ry + nr * rh + 10;
+    if (nr > 0)
+    {
+        draw_text(rx - 20, ty, drc_money[drc_money_rows[r]].note);
+        ty += 34;
+    }
+    // Ch5 before the F$ reveal (flag 1412 == 1, read only): the money box adds F$ to the D$ figure
+    if (global.chapter == 5 && array_length(global.flag) > drc_money_noflag && global.flag[drc_money_noflag] == 1)
+    {
+        draw_text(rx - 20, ty, "The money box shows D$ + F$ for now,");
+        draw_text(rx - 20, ty + 24, "but D$ shops only take the D$ row.");
+    }
+    // footer: the selected row's own steps from the table
+    var _st = (nr > 0) ? drc_money[drc_money_rows[r]] : { step: 10, big: 1000 };
+    draw_text(bx + 20, by + bh - 34, "</> +/-" + string(_st.step) + "  SHIFT +/-" + string(_st.big) + "  X back");
+    draw_set_color(c_white);
+    exit;
+}
+
 if (global.drcheat_page == 4)
 {
     draw_text(bx + 50, by + 12, "RECRUITS");
@@ -224,7 +263,7 @@ for (var i = 0; i < array_length(drc_rows); i++)
     }
     switch (_ri)
     {
-        case 0: v = "< " + string(global.gold) + " >"; break;
+        case 0: v = ">"; break;
         case 3: v = global.drcheat_lockhp ? "ON" : "OFF"; break;
         case 4: v = global.drcheat_nodmg ? "ON" : "OFF"; break;
         case 5: v = global.drcheat_inftp ? "ON" : "OFF"; break;

@@ -7,7 +7,7 @@ freezes and a cheat overlay opens.
 
 | Row | Keys |
 |---|---|
-| Gold | ←/→ ±10 (Shift ±1000) |
+| Money... | Z opens the money page (below) |
 | Heal party / Fill TP | Z |
 | Lock HP / No damage / Infinite TP | Z or ←/→ toggles; stays active after closing. Also covers Chapter 3's game-show board hearts |
 | Puzzle timer | Z or ←/→ cycles OFF / SLOW x3 / FROZEN for the glow-tile puzzle timers (Chapters 1, 3 and 5, e.g. Chapter 5's `room_dw_garden_hardpressureplates`); stays active after closing. Pauses itself for Chapter 5's scripted four-switch puzzle, which the story needs you to fail |
@@ -53,6 +53,28 @@ The list is generated per chapter from the game's own code by `tools/gen_nospare
 
 Re-run it after a game update:
 `DR_OUT_DIR=mods\CheatMenu\chapterN_windows\code UndertaleModCli load chapterN_windows\data.win -s tools\gen_nospare.csx`
+
+### Money page
+
+Open **F7 → Money...**. Each row is one currency of the current chapter: ↑/↓ picks a row, ←/→
+changes it by the row's step (Shift: the big step; the footer shows both), X goes back. Each row
+clamps to its own range (PT 0..9999, like the TV Show page; the rest 0..99999), but → never
+lowers a value the game already put above the cap. Currencies of other chapters are hidden.
+
+| Row | Storage | Chapters | Step / Shift |
+|---|---|---|---|
+| D$ | `global.gold` | 1–5 | 10 / 1000 |
+| Light World $ | `global.lgold` | 1–5 | 10 / 1000 |
+| PT | `flag[1044]` | 3–4 (Chapter 4 spends PT at Gerson's table) | 10 / 100 |
+| Board points | `flag[1117]` | 3 (score of the current board) | 10 / 100 |
+| F$ | `flag[1411]` | 5 | 10 / 1000 |
+| P$ | `flag[1312]` | 5 | 10 / 1000 |
+
+The rows come from the `drc_money` table in `obj_drcheat`'s Create event (name, chapters,
+storage, min/max, steps, help line), so a new currency is one more entry. Chapter 5's
+`flag[1412]` records whether the Flowery Dollars are shown as part of
+D$ or on their own line. It is story state, and the page never writes it. While it is 1, the money
+box shows D$ + F$ but D$ shops only take `global.gold`; the page says so.
 
 ### Recruit editor (Chapters 2–5)
 

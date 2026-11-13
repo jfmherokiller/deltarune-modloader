@@ -77,6 +77,27 @@ BepInEx sits on top of its runtime libraries.
 - **Task 7 fixed.** On other games, LooseMods logs "does not match this exe ...: file overrides
   and loose GML are off" instead of "version check FAILED".
 
+## Done (2026-11-13)
+
+- **CheatMenu Money page (task 27).** F7 → **Money...** replaces the Gold row. The rows come
+  from the `drc_money` table in `obj_drcheat` Create: D$ (`global.gold`), Light World $
+  (`global.lgold`), PT (`flag[1044]`, Ch3–4, 0..9999), Board points (`flag[1117]`, Ch3), F$
+  (`flag[1411]`, Ch5) and P$ (`flag[1312]`, Ch5). Rows from other chapters are hidden. The page
+  never writes the Ch5 F$ reveal state `flag[1412]`. Verified in-game under Proton, with a
+  test-only harness that logged every `global.flag` change:
+  - Ch3: PT and board points change by the table's steps. PT stops at 9999, board points at 0 and
+    D$ at 99999. The TV Show page shows the same PT. The game's own completion save
+    (`scr_complete_save_file`) wrote the edited PT into `filech3_3`, the file Ch4's
+    `scr_load_chapter3` copies `global.flag` from.
+  - Ch4: PT is shown and editable, and the board row is hidden.
+  - Ch5: F$ and P$ edits show up at once in the dark-menu money box. A save with D$ 107598
+    (above the cap) keeps its value on →, and ← lowers it normally. `flag[1412]` stayed 2.
+  - Ch2: only D$ and Light World $ are shown, and both work.
+  - The only flags that changed after each session were the edited currency flags. Nothing
+    crashed and no GML errors appeared.
+  - Not covered: spending PT at Gerson's table in Ch4, and the `flag[1412] == 1` note, which
+    needs a save from before the F$ reveal.
+
 ## Framework tasks
 
 1. **[feature] M: after-call hooks on VM.** `VM_PushFrame` only sees the call start. Seeing the
@@ -175,24 +196,8 @@ BepInEx sits on top of its runtime libraries.
 The CheatMenu items come from `mods_examples/CheatMenu/RESEARCH.md`, which has the storage
 locations and code-entry evidence for each one.
 
-27. **[feature] M: CheatMenu "Money..." page.** Replace the Gold row with a page built from a
-    currency table. Each entry is name, chapters, storage and cap; the page shows the entries for
-    the current chapter:
-
-    | Currency | Storage | Chapters |
-    |---|---|---|
-    | D$ | `global.gold` | all |
-    | Light World $ | `global.lgold` | all |
-    | PT | `flag[1044]` | 3 and 4 (Ch4 spends PT at Gerson's table) |
-    | Board points | `flag[1117]` | 3 |
-    | Flowery Dollars (F$) | `flag[1411]` | 5 |
-    | Pink Dollars (P$) | `flag[1312]` | 5 |
-
-    Rules:
-    - Never touch `flag[1412]`, the Ch5 F$ reveal state.
-    - Clamp values to 0..99999.
-    - While `flag[1412] == 1`, explain that the money box shows D$ + F$ but D$ shops only take
-      `global.gold`.
+27. ~~**[feature] M: CheatMenu "Money..." page.**~~ Done and verified in-game in Chapters 2–5
+    (see Done, 2026-11-13).
 28. **[feature] S: CheatMenu walk/run speed.** Multiply `obj_mainchara.bwspeed`; the game derives
     `wspeed` from it every step. Restore it on toggle-off and on room change. Platformer and
     climbing sections use other objects; check them separately.
