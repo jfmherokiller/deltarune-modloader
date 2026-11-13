@@ -14,7 +14,10 @@
 //   "draw"    Draw GUI while the page is shown. Box: drc_bx, drc_by, drc_bw, drc_bh. The page draws
 //             its title at (drc_bx + 50, drc_by + 12), its rows from drc_by + 48 and its footer at
 //             drc_by + drc_bh - 34. drc_list_top / drc_draw_more scroll long lists.
+//             The init struct may add bw: a wider box for this page (default 420).
 //   "leave"   leaving the page (X back to the main page, or closing the menu).
+// While a page sets drc_page_busy = 1 (e.g. a prompt is open), X does not leave the page: the page
+// reads X itself (to cancel the prompt) and clears drc_page_busy. F7 still closes the menu ("leave").
 // A new page = one new script + one drc_page_add line below.
 depth = -99999;
 if (!variable_global_exists("drcheat_open"))
@@ -40,6 +43,7 @@ drc_names = ["?", "Kris", "Susie", "Ralsei", "Noelle"];
 drc_step = 0;
 drc_big = 0;
 drc_ok = 0;
+drc_page_busy = 0;
 // menu box (set by Draw GUI each frame)
 drc_bx = 0;
 drc_by = 0;
@@ -87,6 +91,7 @@ drc_close = function()
 {
     drc_page_call("leave");
     global.drcheat_page = 0;
+    drc_page_busy = 0;
     for (var i = 0; i < array_length(drc_frozen); i++)
         instance_activate_object(drc_frozen[i]);
     drc_frozen = [];
@@ -106,13 +111,15 @@ drc_page_add = function(_scr, _top)
     var _info = script_execute(_scr, "init");
     if (is_undefined(_info))
         return;
-    array_push(drc_pages, { scr: _scr, top: _top, label: _info.label, why: _info.why });
+    var _bw = variable_struct_exists(_info, "bw") ? _info.bw : 420;
+    array_push(drc_pages, { scr: _scr, top: _top, label: _info.label, why: _info.why, bw: _bw });
 };
 drc_page_add(scr_drcheat_page_money, 1);
 drc_page_add(scr_drcheat_page_inventory, 0);
 drc_page_add(scr_drcheat_page_enemies, 0);
 drc_page_add(scr_drcheat_page_recruits, 0);
 drc_page_add(scr_drcheat_page_tv, 0);   // Chapter 3 only
+drc_page_add(scr_drcheat_page_flags, 0);
 
 // ---- main page rows: { label, key }, key = a built-in row (Step/Draw switch on it) or "page"
 // (then page = its index in drc_pages)

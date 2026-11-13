@@ -18,6 +18,7 @@ freezes and a cheat overlay opens.
 | Enemies... | Z opens the enemy editor (below) |
 | Recruits... | Z opens per-enemy recruit counts (Chapters 2–5; below) |
 | TV Show... | Chapter 3 only: Z opens the TV show page (below) |
+| Flags... | Z opens the `global.flag` / `global.plot` viewer and editor (below) |
 | Close | Z, X or F7 |
 
 The box never grows past the screen: when the rows don't fit (the main page in every chapter, the
@@ -56,6 +57,33 @@ The list is generated per chapter from the game's own code by `tools/gen_nospare
 
 Re-run it after a game update:
 `DR_OUT_DIR=mods\CheatMenu\chapterN_windows\code UndertaleModCli load chapterN_windows\data.win -s tools\gen_nospare.csx`
+
+### Flags page
+
+Open **F7 → Flags...**. The first row is `global.plot`, which shows the story milestone label.
+Every other row is one `global.flag[n]` with its value and our name for it. Flags that are not
+in our list show *unknown*. The panel at the bottom shows the selected flag's short id, its
+description and its value notes. Names come from `data/flags.json`, built into
+`chapterN_windows/code/gml_GlobalScript_scr_drcheat_flagnames.gml`; see `data/README.md`.
+
+| Key | Effect |
+|---|---|
+| ↑/↓ (hold to repeat; Shift: a page) | move one row |
+| ←/→ (Shift ×10), PgUp/PgDn, Home/End | move a page / to the ends |
+| F | filter: All → Named → Non-zero |
+| J | type an index, Z jumps to it (or to the next listed flag); out-of-range input is clamped |
+| Z | edit the selected row |
+
+**Editing takes two steps.**
+1. Type the new number or use ←/→ (±1; Shift ±10). Negative and fractional values are allowed;
+   recruit flags are fractions. Press Z.
+2. A prompt asks *Set flag[N] (label) from X to Y?* and preselects **No**. Only Z on **Yes**
+   writes anything. X, No, F7 or leaving the page cancels and writes nothing.
+
+The write is refused if the value changed after the prompt opened. Non-numeric values are
+read-only. The page reads the flag count from `array_length(global.flag)`, so it never indexes
+past the current chapter's array. The page is raw story state: wrong values can break scenes,
+and lowering `plot` replays content.
 
 ### Money page
 

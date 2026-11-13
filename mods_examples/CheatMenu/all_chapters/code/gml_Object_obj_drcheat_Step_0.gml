@@ -98,15 +98,17 @@ if (!global.drcheat_open)
         script_execute(drc_pages[_p].scr, "tick");
 }
 
-// ---- open / close
-if (global.drcheat_open && global.drcheat_page != 0 && keyboard_check_pressed(ord("X")))
+// ---- open / close. X goes back from a page, unless the page has a prompt open (drc_page_busy):
+// then the page gets X itself to cancel the prompt.
+var _xkey = keyboard_check_pressed(ord("X")) && !(global.drcheat_open && global.drcheat_page != 0 && drc_page_busy);
+if (global.drcheat_open && global.drcheat_page != 0 && _xkey)
 {
     drc_page_call("leave");
     global.drcheat_page = 0;
     snd_play(snd_smallswing);
     exit;
 }
-if (keyboard_check_pressed(vk_f7) || (global.drcheat_open && keyboard_check_pressed(ord("X"))))
+if (keyboard_check_pressed(vk_f7) || (global.drcheat_open && _xkey))
 {
     if (!global.drcheat_open)
     {

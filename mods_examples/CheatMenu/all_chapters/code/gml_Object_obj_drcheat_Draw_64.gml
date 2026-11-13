@@ -18,6 +18,8 @@ draw_set_alpha(1);
 // when its rows don't fit; with a 480-pixel GUI that is 14 rows)
 var rh = 26;
 var bw = 420;
+if (global.drcheat_page > 0 && global.drcheat_page < array_length(drc_pages))
+    bw = min(drc_pages[global.drcheat_page].bw, cw - 16);   // a page may ask for a wider box
 var bh = min(466 + (array_length(drc_rows) - 14) * rh, chh - 16);
 var bx = cx + (cw - bw) / 2;
 var by = cy + (chh - bh) / 2;
