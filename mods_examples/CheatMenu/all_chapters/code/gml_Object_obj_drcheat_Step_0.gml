@@ -2,6 +2,8 @@
 var _hastp = variable_global_exists("tension") && variable_global_exists("maxtension");
 if (!global.drcheat_open)
 {
+    // walk speed: scales obj_mainchara.bwspeed; at OFF it only puts back a value it wrote
+    scr_drcheat_speed_apply(drc_speed_mults[clamp(global.drcheat_speed, 0, array_length(drc_speed_mults) - 1)]);
     if (global.drcheat_lockhp)
     {
         for (var i = 0; i < 3; i++)
@@ -392,6 +394,18 @@ if (global.char[slot] <= 0)
 var ch = global.char[slot];
 
 var _sel = global.drcheat_sel;
+if (_sel == drc_row_speed)
+{
+    if (ok || step != 0)
+    {
+        var _ns = array_length(drc_speed_mults);
+        global.drcheat_speed = (global.drcheat_speed + (step < 0 ? _ns - 1 : 1)) mod _ns;
+        snd_play(snd_select);
+    }
+    _sel = -1;
+}
+else if (_sel > drc_row_speed)
+    _sel--;
 if (_sel == drc_row_puzzle)
 {
     if (ok || step != 0)

@@ -90,6 +90,16 @@ drc_rec_current = function(_r)
     return clamp(round(_v * drc_rec_max[_r]), 0, drc_rec_max[_r]);
 };
 
+// ---- walk speed (ROADMAP 28): multiplier row after "Puzzle timer". The row is inserted here
+// so drc_rows stays one list; Step/Draw shift the rows after it back to their old numbers.
+// Applied every step by scr_drcheat_speed_apply (scales obj_mainchara.bwspeed, restores it at x1).
+if (!variable_global_exists("drcheat_speed"))
+    global.drcheat_speed = 0;   // index into drc_speed_mults; 0 = off (vanilla)
+drc_speed_mults = [1, 1.5, 2, 3];
+drc_speed_names = ["OFF", "x1.5", "x2", "x3"];
+drc_row_speed = drc_row_puzzle + 1;
+array_insert(drc_rows, drc_row_speed, "Walk speed");
+
 // ---- inventory editor (dark world inventory: items, weapons, armor, key items)
 drc_inv_cats = ["Items", "Weapons", "Armor", "Key Items"];
 drc_inv_ready = 0;

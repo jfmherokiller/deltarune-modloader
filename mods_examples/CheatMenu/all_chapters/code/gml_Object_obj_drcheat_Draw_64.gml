@@ -215,6 +215,8 @@ for (var i = 0; i < array_length(drc_rows); i++)
     draw_text(rx, y0, drc_rows[i]);
     var v = "";
     var _ri = (i > drc_row_puzzle) ? i - 1 : i;
+    if (i > drc_row_speed) _ri--;
+    if (i == drc_row_speed) { v = drc_speed_names[clamp(global.drcheat_speed, 0, array_length(drc_speed_names) - 1)]; _ri = -1; }
     if (i == drc_row_puzzle)
     {
         v = (global.drcheat_puzzlet == 2) ? "FROZEN" : ((global.drcheat_puzzlet == 1) ? "SLOW x3" : "OFF");
