@@ -290,6 +290,12 @@ locations and code-entry evidence for each one.
     one plugin (RunnerCompiler). Publish one `gmlrt::Runtime` per process as an Aurie interface
     (like `GmScriptHooks`), so mods and the editor (task 16) share the CLR, the cache and the
     string table instead of each hosting their own.
+47. **[feature] S: DialogueBacklog transcript is hard to find.** It is written to the game's save
+    folder (`%LOCALAPPDATA%\DELTARUNE\dialogue_log_chN.txt`), which under Proton is deep inside the
+    Wine prefix. The owner tested everything else and only this was a problem (2026-11-14). Options:
+    show the full path in the backlog's footer, write a copy next to the mod in `mods\DialogueBacklog\`
+    (GameMaker's file sandbox may need LooseMods' help to write outside the save folder), or both.
+48. **[idea] M (optional, later): DialogueBacklog character portraits** next to speaker names.
 
 ## What goes upstream (proposed policy)
 

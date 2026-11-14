@@ -106,8 +106,11 @@ Overview and evidence: `../docs/yyc_il2cpp.md`. Test game: Dwarf Eats Mountain 1
   by decompiling the output. Installed in the game's `mods/`.
 - [x] Ch5 live run (v1): transcript written with correct speakers (Susie, Asgore, Flowery); long pages were logged twice (writer re-wrap inserts `||`), fixed in the page key + add() dedupe.
 - [x] In-game test of the fixed build: open/scroll/close T in overworld and battle (confirmed by the owner 2026-11-14).
-- [ ] Still untested in-game: speaker names, choice entry, transcript file location under Proton,
-  reload after relaunch.
+- [x] Speaker names, choice entry and reload after relaunch work as designed (owner, 2026-11-14).
+- [ ] Transcript file location: the owner couldn't find it easily. Under Proton it is in the
+  prefix (`compatdata/1671210/pfx/drive_c/users/steamuser/AppData/Local/DELTARUNE/dialogue_log_chN.txt`);
+  see ROADMAP 47.
+- [ ] Optional, later: character portraits next to speaker names (ROADMAP 48).
 
 Durable notes so work can be picked up later. Two parallel tracks:
 
