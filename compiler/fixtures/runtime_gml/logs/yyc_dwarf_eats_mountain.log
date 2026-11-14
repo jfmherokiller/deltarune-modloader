@@ -1,0 +1,25 @@
+link plan: 1 object(s)
+link: YYC runner, data.win image 00000000028E0060, string table slot 0000000141B6F780 (exe+0x1b6f780), 15096 strings
+link: show_debug_message hooked for "debug" checks
+link: in-process compiler ready
+link: gmlrt_smoke.gml -> gml_GlobalScript_gmlrt_0, 284 bytes, 2 new strings, 0 script calls lowered, CCode 000000000623ED50 (compiled + linked in 18226 us)
+link: 15096 runner strings, 2 appended; private bytes 402911232
+run: gmlrt_smoke.gml #1 -> string gmlrt smoke says 10
+mem: run 10, private bytes 404017152
+mem: run 100, private bytes 405004288
+mem: run 200, private bytes 407252992
+mem: run 300, private bytes 409513984
+mem: run 400, private bytes 409673728
+mem: run 500, private bytes 409821184
+mem: run 600, private bytes 409980928
+mem: run 700, private bytes 410140672
+mem: run 800, private bytes 410296320
+mem: run 900, private bytes 410443776
+run: gmlrt_smoke.gml #1000 -> string gmlrt smoke says 10
+  check PASS: result == gmlrt smoke says 10 (got gmlrt smoke says 10)
+  check PASS: global gmlrt_smoke_runs == 1000 (got 1000)
+  check PASS: self gmlrt_smoke_sum == 10 (got 10)
+  check PASS: global gmlrt_smoke_room_speed_ok == 1 (got 1)
+  check PASS: debug == gmlrt smoke says 10 (got gmlrt smoke says 10)
+mem: run 1000, private bytes 412676096
+link: done, 1/1 objects linked, 1 CCode objects, 2 appended strings, private bytes 404017152 at run 10 -> 412676096 (8658944), 0 failure(s)

@@ -28,6 +28,45 @@ public static unsafe class RuntimeExports
     public static int Ping(byte* output, int capacity) =>
         Reply($"LooseModCompiler runtime {Environment.Version} in pid {Environment.ProcessId}, {RuntimeInformation.OSDescription}", output, capacity);
 
+    static readonly object compileLock = new();
+    static UndertaleData objectContext;
+    static string objectContextPath;
+    static bool objectContextYyc;
+
+    /// <summary>
+    /// Compile <paramref name="gml"/> as code entry <paramref name="codeName"/> into a linkable object
+    /// (.gmlo text, compiler/RUNTIME_COMPILER.md) for gmlo::Linker / gmlrt::Runtime. The data.win at
+    /// <paramref name="dataPath"/> is only the compile context (VM or YYC; loaded once, prepared with
+    /// ObjectCompiler.PrepareContext). Thread-safe. Empty <paramref name="gml"/> only loads the context.
+    /// Returns the text length in bytes, or -(error length) - 1 with the error in the output.
+    /// </summary>
+    [UnmanagedCallersOnly]
+    public static int CompileObject(byte* dataPath, byte* codeName, byte* gml, byte* output, int capacity)
+    {
+        try
+        {
+            var path = Utf8(dataPath); var name = Utf8(codeName); var source = Utf8(gml) ?? "";
+            lock (compileLock)
+            {
+                if (objectContext == null || objectContextPath != path)
+                {
+                    using var fs = File.OpenRead(path);
+                    objectContext = UndertaleIO.Read(fs, (_, _) => { }, _ => { });
+                    objectContextPath = path;
+                    objectContextYyc = objectContext.IsYYC();   // before PrepareContext adds CODE
+                    GmlObjectCompiler.ObjectCompiler.PrepareContext(objectContext);
+                }
+                if (source.Length == 0) return Reply(objectContextYyc ? "context YYC" : "context VM", output, capacity);
+                var obj = GmlObjectCompiler.ObjectCompiler.Compile(objectContext, name, source);
+                return Reply(obj.ToText(), output, capacity);
+            }
+        }
+        catch (Exception e)
+        {
+            return -Reply(e.Message, output, capacity) - 1;
+        }
+    }
+
     /// <summary>
     /// Compile <paramref name="gml"/> as code entry <paramref name="codeName"/> against data.win at
     /// <paramref name="dataPath"/> (loaded once and cached) and return a disassembly report.

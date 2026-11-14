@@ -1,0 +1,2 @@
+# <object> <runs> [check ; check ...]   (RunnerCompiler link mode; a .gml entry is compiled in the game)
+gmlrt_smoke.gml 1000 result gmlrt smoke says 10 ; global gmlrt_smoke_runs 1000 ; self gmlrt_smoke_sum 10 ; global gmlrt_smoke_room_speed_ok 1 ; debug gmlrt smoke says 10

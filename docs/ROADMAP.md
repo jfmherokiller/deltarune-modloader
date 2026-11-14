@@ -77,6 +77,22 @@ BepInEx sits on top of its runtime libraries.
 - **Task 7 fixed.** On other games, LooseMods logs "does not match this exe ...: file overrides
   and loose GML are off" instead of "version check FAILED".
 
+## Done (2026-11-14)
+
+- **Runtime GML on VM and YYC (tasks 4 and 41).** One API, `gmlrt::Runtime::CompileAndRun(source,
+  self, result, err)` in `modloader/include/gml_runtime.hpp`, compiles GML in the game
+  (`RuntimeExports.CompileObject`, the same Underanalyzer code as `GmlObjectCompiler`), links it
+  against the live runner with the shared `gmlo::Linker` (`gmlo_link.hpp`; it detects YYC and
+  lowers script calls there) and runs it through `Code_Execute`. Compile and link results are
+  cached by source. Smoke test: `compiler/fixtures/runtime_gml/gmlrt_smoke.gml` (locals, loop,
+  built-in calls, a global, an instance variable on the running instance, `room_speed`, a new
+  string, `show_debug_message`) ran 1000 times through RunnerCompiler link mode on the DELTARUNE
+  launcher (VM, Proton) and on Dwarf Eats Mountain (YYC, Wine 11). All 5 checks passed on both,
+  with no fault and no growth per run against an empty-snippet control.
+  `compiler/tests/test_gml_runtime.py` checks the committed objects, linked bytes and logs.
+  Architecture and limits: `compiler/RUNTIME_COMPILER.md` "Runtime GML API". Follow-ups: tasks
+  42–46.
+
 ## Done (2026-11-13)
 
 - **CheatMenu Light World page (task 29).** F7 → **Light World...** edits `global.lhp`
@@ -136,22 +152,11 @@ BepInEx sits on top of its runtime libraries.
    - `MdUnmapImage` on request, for the editor;
    - a per-plugin log file option;
    - listing loaded plugins over the RunnerEditor pipe.
-4. **[feature] L: runtime linking of compiled GML.** Turn Underanalyzer output into a runnable
-   `CCode`: rewrite variable, built-in and string operands to runtime ids, and route script calls
-   through `script_execute`. Shared by VM and YYC (`compiler/RUNTIME_COMPILER.md`,
-   `modloader/yyc_vm_probe`). The VM load-time fixup is derived and tested. Only variable and
-   function operands are rewritten, and string indices are kept. Rules: RUNTIME_COMPILER.md
-   "Load-time operand fixup". Code: `compiler/tools/bytecode_fixup.py`. YYC half done
-   (2026-11-14): `compiler/GmlObjectCompiler` output is linked in-process by
-   `modloader/include/gmlo_link.hpp` (runner tables, string-table append, script calls lowered to
-   `script_execute`) and runs on Dwarf Eats Mountain's embedded VM; four snippets × 300 runs pass
-   (RUNTIME_COMPILER.md "YYC: running linked bytecode"). VM half done (2026-11-14): the same
-   `gmlo::Linker` runs in `compiler/RunnerCompiler` link mode on the DELTARUNE launcher; five
-   snippets (globals, `show_debug_message`, a script call, locals + instance variable + `x`,
-   arrays + strings) × 1000 runs pass with no fault and no growth per run, and new strings are
-   appended to the VM's table (RUNTIME_COMPILER.md "VM: running linked bytecode", fixtures in
-   `compiler/fixtures/runtime_link/`). Still to do: one entry point for both runners
-   (compile-in-game to `.gmlo`), and script replacement with linked code.
+4. ~~**[feature] L: runtime linking of compiled GML.**~~ Done (see Done 2026-11-14):
+   `gmlrt::Runtime` (`modloader/include/gml_runtime.hpp`) compiles, links and runs GML source on
+   VM and YYC runners. Design, per-runner details and limits: `compiler/RUNTIME_COMPILER.md`
+   ("Runtime GML API", "YYC: running linked bytecode", "VM: running linked bytecode").
+   Follow-ups: 42–46.
 5. **[feature] M: generic loose-asset overrides.** Find `ReadEntireFile` by signature instead of
    by RVA, so the data.win redirect works in other VM games. YYC data.win still holds sprites,
    sounds and strings, so asset mods would also work on YYC games.
@@ -262,9 +267,28 @@ locations and code-entry evidence for each one.
     `Code_Execute` (events, global scripts). `gm::Observe("")` would add script calls on VM.
 40. **[feature] M: Cheat Engine dissector follow-ups.** Symbol lookup callback (`global.gold`) and
     array element expansion (`RE/TODO.md`).
-41. **[test] S: ~~RunnerCompiler spike live run~~** (done, see Done 2026-11-13; fixtures in
-    `compiler/fixtures/runtime_bytecode/`), then `compiler/tools/compare_runtime_bytecode.py`
-    to derive the load-time operand fixup. This is the first step of task 4.
+41. ~~**[test] S: RunnerCompiler spike live run.**~~ Done: live capture (Done 2026-11-13,
+    `compiler/fixtures/runtime_bytecode/`), the load-time operand fixup derived from it
+    (`compiler/RUNTIME_COMPILER.md` "Load-time operand fixup"), and the end-to-end smoke test on
+    both runner kinds (Done 2026-11-14, `compiler/fixtures/runtime_gml/`).
+
+## Runtime GML follow-ups (from tasks 4 and 41)
+
+42. **[feature] M: script replacement with linked code.** Point an existing script's `CCode` (VM)
+    or its YYC function at a linked buffer. Prerequisite for task 2 (second route) and task 16.
+43. **[feature] M: function declarations in snippets.** `ObjectCompiler.Compile` rejects code that
+    creates child entries (`function`, constructors, `static`). Needs child `CCode`s sharing the
+    parent buffer, and `push.i` function-id relocations to them.
+44. **[feature] M: compile context from the live runner.** The compiler loads the data.win on disk.
+    With loose mods active the game runs a patched data.win, so names that only mods add are
+    unknown to the compiler. Implement Underanalyzer's `IGameContext` over YYTK lookups (asset,
+    script and function names), then no data.win is needed at all (RUNTIME_COMPILER.md piece 2).
+45. **[test] S: YYC script values.** Only `call.i` of a script is lowered. A script used as a value
+    (`push.i` of its id, `method()`, `callv`) is linked unchanged and untested on YYC.
+46. **[feature] S: a GmlRuntime plugin with a public interface.** Today the API is a header used by
+    one plugin (RunnerCompiler). Publish one `gmlrt::Runtime` per process as an Aurie interface
+    (like `GmScriptHooks`), so mods and the editor (task 16) share the CLR, the cache and the
+    string table instead of each hosting their own.
 
 ## What goes upstream (proposed policy)
 

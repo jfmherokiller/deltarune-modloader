@@ -1,0 +1,34 @@
+GMLO 1
+name gml_GlobalScript_gmlrt_0
+locals 4
+args 0
+local arguments
+local total
+local k
+local msg
+code 840f0000 4525fff9 a0000000 840f0001 4525fff9 a0000000 c105fff9 a0000000 840f0004 15520200 b8000012 c005fff9 a0000000 c105fff9 a0000000 11050000 d9020001 00000000 0c550000 4555fff9 a0000000 c005fff9 a0000000 c00f0001 0c520000 4555fff9 a0000000 b67fffeb c0060000 00003afa 07560000 d9020001 00000000 07450000 b8000004 c205fffb a0000000 b6000003 840f0000 07520000 840f0001 0c520000 4555fffb a0000000 c105fff9 a0000000 4555ffff a0000000 c305fffa a0000000 840f0000 15520600 4545fffb a0000000 c0060000 00003b02 c105fff9 a0000000 d9020001 00000000 0c650000 4555fff9 a0000000 c105fff9 a0000000 d9020001 00000000 9e050000 c105fff9 a0000000 9c050000
+reloc 4 var -7 total
+reloc 16 var -7 k
+reloc 24 var -7 k
+reloc 44 var -7 total
+reloc 52 var -7 k
+reloc 64 func abs
+reloc 76 var -7 total
+reloc 84 var -7 k
+reloc 100 var -7 k
+reloc 112 string gmlrt_smoke_runs
+reloc 124 func variable_global_exists
+reloc 140 var -5 gmlrt_smoke_runs
+reloc 168 var -5 gmlrt_smoke_runs
+reloc 176 var -7 total
+reloc 184 var -1 gmlrt_smoke_sum
+reloc 192 var -1 room_speed
+reloc 208 var -5 gmlrt_smoke_room_speed_ok
+reloc 216 string gmlrt smoke says 
+reloc 224 var -7 total
+reloc 232 func string
+reloc 244 var -7 msg
+reloc 252 var -7 msg
+reloc 260 func show_debug_message
+reloc 272 var -7 msg
+end

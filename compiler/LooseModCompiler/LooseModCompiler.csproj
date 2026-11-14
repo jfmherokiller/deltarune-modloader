@@ -37,6 +37,8 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../modloader/tools/ImportLooseMod.csx" Link="ImportLooseMod.cs" />
+    <!-- GML -> .gmlo object compiler, shared with the GmlObjectCompiler CLI (RuntimeExports.CompileObject) -->
+    <Compile Include="../GmlObjectCompiler/GmlObject.cs" Link="GmlObject.cs" />
     <ProjectReference Include="../../external/UndertaleModTool/UndertaleModLib/UndertaleModLib.csproj" />
   </ItemGroup>
 </Project>

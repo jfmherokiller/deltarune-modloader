@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runtime linking of GmlObjectCompiler output (compiler/tools/gml_object.py, GmlLinker.cpp).
+"""Runtime linking of GmlObjectCompiler output (compiler/tools/gml_object.py, gmlo_link.hpp).
 
     python3 -m unittest discover -s compiler/tests -v
 

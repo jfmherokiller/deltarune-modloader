@@ -1,0 +1,21 @@
+link plan: 1 object(s)
+link: YYC runner, data.win image 00000000028E0060, string table slot 0000000141B6F780 (exe+0x1b6f780), 15096 strings
+link: show_debug_message hooked for "debug" checks
+link: in-process compiler ready
+link: gmlrt_noop.gml -> gml_GlobalScript_gmlrt_0, 12 bytes, 0 new strings, 0 script calls lowered, CCode 0000000001920BB0 (compiled + linked in 11455 us)
+link: 15096 runner strings, 0 appended; private bytes 398692352
+run: gmlrt_noop.gml #1 -> number 0
+mem: run 10, private bytes 399781888
+mem: run 100, private bytes 399921152
+mem: run 200, private bytes 402190336
+mem: run 300, private bytes 402358272
+mem: run 400, private bytes 402501632
+mem: run 500, private bytes 402661376
+mem: run 600, private bytes 402821120
+mem: run 700, private bytes 402976768
+mem: run 800, private bytes 403128320
+mem: run 900, private bytes 403288064
+run: gmlrt_noop.gml #1000 -> number 0
+  check PASS: result == 0 (got 0)
+mem: run 1000, private bytes 405438464
+link: done, 1/1 objects linked, 1 CCode objects, 0 appended strings, private bytes 399781888 at run 10 -> 405438464 (5656576), 0 failure(s)

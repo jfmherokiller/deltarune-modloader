@@ -1,0 +1,26 @@
+link plan: 1 object(s)
+link: VM runner, data.win image 0000000003380060, string table slot 00000001406A9E20 (exe+0x6a9e20), 1144 strings
+link: show_debug_message hooked for "debug" checks
+link: resolver self-test (launcher fixture ids): room_speed=136 x=0 i=100049 method=162 abs=200 @@NewGMLArray@@=2253 gml_Script_strlen=100081
+link: in-process compiler ready
+link: gmlrt_smoke.gml -> gml_GlobalScript_gmlrt_0, 284 bytes, 2 new strings, 0 script calls lowered, CCode 00000000012C6F70 (compiled + linked in 33106 us)
+link: 1144 runner strings, 2 appended; private bytes 134184960
+run: gmlrt_smoke.gml #1 -> string gmlrt smoke says 10
+mem: run 10, private bytes 134266880
+mem: run 100, private bytes 134316032
+mem: run 200, private bytes 134336512
+mem: run 300, private bytes 134352896
+mem: run 400, private bytes 135348224
+mem: run 500, private bytes 135389184
+mem: run 600, private bytes 135401472
+mem: run 700, private bytes 135409664
+mem: run 800, private bytes 135450624
+mem: run 900, private bytes 135454720
+run: gmlrt_smoke.gml #1000 -> string gmlrt smoke says 10
+  check PASS: result == gmlrt smoke says 10 (got gmlrt smoke says 10)
+  check PASS: global gmlrt_smoke_runs == 1000 (got 1000)
+  check PASS: self gmlrt_smoke_sum == 10 (got 10)
+  check PASS: global gmlrt_smoke_room_speed_ok == 1 (got 1)
+  check PASS: debug == gmlrt smoke says 10 (got gmlrt smoke says 10)
+mem: run 1000, private bytes 135462912
+link: done, 1/1 objects linked, 1 CCode objects, 2 appended strings, private bytes 134250496 at run 10 -> 135462912 (1212416), 0 failure(s)

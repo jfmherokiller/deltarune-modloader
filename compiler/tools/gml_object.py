@@ -2,7 +2,7 @@
 """gml_object.py - linkable GML objects (.gmlo) from compiler/GmlObjectCompiler, offline side.
 
 A .gmlo is one code entry compiled by Underanalyzer with every reference operand left unresolved,
-plus a relocation table. The runtime linker (compiler/RunnerCompiler/native/GmlLinker.cpp) resolves
+plus a relocation table. The runtime linker (modloader/include/gmlo_link.hpp) resolves
 it against the running game; this module reads the same format and links it offline, so the two
 can be compared (compiler/tests/test_gml_object.py). Format, one record per line:
 

@@ -17,10 +17,12 @@ and could later live in YYToolkit.
    - Measured with `clrhost-test`, Linux native, Ch1: runtime up in 22 ms, first compile 303 ms
      (includes the data.win load), next compiles 6 ms.
    - Measured under Wine, Ch4: runtime up in 69 ms, first compile 1.2 s, next compiles 35 ms.
-2. **Game context** (TODO). The spike compiles against a data.win loaded in-process with
-   UndertaleModLib. The general version implements Underanalyzer's `IGameContext` from the live
-   runner: asset names, built-in and script function tables, and the variable list. YYToolkit
-   already exposes most of these lookups. With that, the managed side needs no data.win at all.
+2. **Game context** (partly done). `RuntimeExports.CompileObject` compiles against the game's
+   data.win on disk, loaded in-process with UndertaleModLib (VM or YYC; for YYC the missing chunks
+   are added by `ObjectCompiler.PrepareContext`). The general version implements Underanalyzer's
+   `IGameContext` from the live runner: asset names, built-in and script function tables, and the
+   variable list. YYToolkit already exposes most of these lookups. With that, the managed side
+   needs no data.win at all (ROADMAP 44).
 3. **Linking and running** (done on VM and YYC). The runner rewrites bytecode operands while it
    loads the CODE chunk: variable and function references become runtime ids. String indices
    are not rewritten. The rules are in "Load-time operand fixup" below, and
@@ -29,7 +31,95 @@ and could later live in YYToolkit.
    against the live runner, wraps the code in a hand-built `CCode` and runs it through YYTK
    `ExecuteCodeObject`. See "Linking and running compiled GML" below (API) and the per-runner
    sections. Replacing an existing script's code (pointing `CCode->m_VmInstance` at a linked
-   buffer) is not done yet.
+   buffer) is not done yet (ROADMAP 42).
+4. **One entry point** (done on VM and YYC). `modloader/include/gml_runtime.hpp`,
+   `gmlrt::Runtime::CompileAndRun(source, self, result, err)`, ties 1–3 together. See "Runtime GML
+   API" below.
+
+## Runtime GML API (ROADMAP 4 and 41, final architecture)
+
+```cpp
+#include <gml_runtime.hpp>              // modloader/include; pulls in gmlo_link.hpp
+// once, on a worker thread (CLR start ~100 ms): host the compiler shipped in mods/tools/compiler
+RunnerCompiler::ClrHost host;           // compiler/RunnerCompiler/native/ClrHost.{hpp,cpp}
+host.Start(compilerDir, L"LooseModCompiler");
+auto compile = (gmlrt::CompileObjectFn)host.Function(gmlrt::kCompilerType, gmlrt::kCompileObject);
+static gmlrt::Runtime rt(yytk, compile, dataWinPath);   // keep for the process lifetime
+std::string info; rt.Warm(info);        // optional, any thread: load the compile context early
+// game thread (a YYTK callback):
+RValue result; std::string err;
+if (!rt.CompileAndRun("global.n += 1; return x;", self, result, err)) log(err);
+```
+
+```
+GML source ──CompileObject (managed, in-process)──> .gmlo text ──gmlo::Parse──> gmlo::Object
+   │ Underanalyzer via UndertaleModLib; data.win = compile context only (VM or YYC)
+   ▼
+gmlo::Linker::Link (live runner tables, YYTK) ──> gmlo::Linked { CCode, VMBuffer, bytecode }
+   │ var: GetBuiltinVariableIndex / GetVariableSlot   func: GetNamedRoutineIndex
+   │ string: RunnerStrings (existing index, or appended to the runner's table)
+   │ YYC only (IsYYCRunner): call.i <script> -> script_execute, branches fixed up
+   ▼
+gmlo::Linker::Run ──YYTK ExecuteCodeObject──> the runner's Code_Execute -> VM::Exec, SEH-guarded
+```
+
+| Stage | Code | Thread | Runner-specific |
+|---|---|---|---|
+| compile | `RuntimeExports.CompileObject` (`compiler/LooseModCompiler/RuntimeExports.cs`), which compiles `compiler/GmlObjectCompiler/GmlObject.cs` into the shipped compiler; the `GmlObjectCompiler` CLI uses the same file | any (locked) | YYC data.win gets empty `CODE`/`VARI`/`FUNC` and script declarations (`PrepareContext`) |
+| link | `gmlo::Linker` (`modloader/include/gmlo_link.hpp`) | game | script-call lowering on YYC, chosen at run time by `IsYYCRunner`; every id is looked up live, so built-in indices that differ per runner version (`room_speed` 136 vs 139) need no table |
+| run | `gmlo::Linker::Run` | game | none: the `CCode`/`VMBuffer` layout is the same on both (sections below) |
+| API | `gmlrt::Runtime` (`modloader/include/gml_runtime.hpp`) | game (`Warm`: any) | none |
+
+`Runtime` methods: `CompileAndRun(source, self, result, err[, other])`; `Compile(source, err)` →
+`gmlo::Linked*` (compile + link, cached by source text); `Run(linked, self, other, result, err)`;
+`Load(gmloText, err)` for prebuilt `.gmlo` files; `CompileObject` (compile only, any thread);
+`Warm(info)`; `IsYYC()`; `Ready(err)` (false on a YYToolkit without `ExecuteCodeObject`). A
+`null` `self` runs as the global instance. The first compile of a snippet takes 10–35 ms on the
+game thread; running it again only costs the run.
+
+Smoke test (2026-11-14): `compiler/fixtures/runtime_gml/gmlrt_smoke.gml`, one source with no
+game-specific names, through RunnerCompiler link mode (a `.gml` entry in `link.txt` runs
+`Runtime::CompileAndRun` on every run):
+
+| Runner | Game | Result |
+|---|---|---|
+| VM | DELTARUNE launcher, Proton CachyOS 11 | 1000 runs, 5/5 checks PASS, 0 faults; 2 strings appended; +1.2 MB private bytes over runs 10–1000, all of it while the launcher settles (the earlier empty-snippet control grew the same) |
+| YYC | Dwarf Eats Mountain 1.1.0, Wine 11.21 | 1000 runs, 5/5 checks PASS, 0 faults; 2 strings appended; +8.7 MB over runs 10–1000 vs +5.7 MB for the empty-snippet control (`gmlrt_noop.gml`), with the same slope (~155 KB per 100 runs) from run 400 on, so the growth is the game's, not per run |
+
+Checks: the return value `"gmlrt smoke says 10"`, `global.gmlrt_smoke_runs` = 1000,
+`self.gmlrt_smoke_sum` = 10 on the running object instance (the first instance-variable test on
+YYC), `global.gmlrt_smoke_room_speed_ok` = true, and `show_debug_message` received the new
+string. The unlinked code was the same for both games except the compile-time `push.s` indices;
+the linked bytes differ in every runner id. `compiler/tests/test_gml_runtime.py` checks the
+committed objects, linked bytes and logs (`compiler/fixtures/runtime_gml/README.md`).
+
+Reproduce: build `compiler/build.sh` (win-x64, into `<game>/mods/tools/compiler`),
+`compiler/RunnerCompiler/build.sh` and the fork YYToolkit (`tools/build_yytoolkit.sh`); copy
+`RunnerCompiler.dll` and `YYToolkit.dll` to `mods/aurie/`, and `gmlrt_smoke.gml` + `link.txt` from
+the fixture folder to `mods/aurie/runnercompiler/`; run the game as in "Reproduce" in the VM or
+YYC section; read `runnercompiler/link.log`. On a YYC game also install the current loader
+(`modloader/build.sh`) and disable other plugins.
+
+Known limitations (all runners):
+- Snippets only. Replacing an existing script's code with linked code is not done (ROADMAP 42).
+- No function declarations, constructors or `static` in snippets: they create child entries,
+  which `ObjectCompiler.Compile` rejects (ROADMAP 43).
+- The compile context is the data.win on disk. With loose mods active the game runs a patched
+  data.win, so names only a mod adds are unknown to the compiler (ROADMAP 44). Runtime ids are
+  always the live runner's, so linking is not affected.
+- On YYC only `call.i` of a script is lowered; a script used as a value is untested (ROADMAP 45).
+- Linked code and compile results are never freed (by design: `VMBuffer::Prepare` caches by
+  bytecode address). Each distinct snippet costs a few hundred bytes for the process lifetime;
+  do not generate unbounded distinct sources.
+- Game thread only for `Compile`/`Run`; after a fault (`err` starts with `exception`) the VM state
+  is not unwound, so stop running linked code.
+- Needs the fork YYToolkit (`ExecuteCodeObject`); `Ready` refuses older builds instead of crashing.
+- `CCode`/`VMBuffer` offsets are taken from the 2024 runners (DELTARUNE, Dwarf Eats Mountain) and
+  are not version-checked (ROADMAP 11 covers the probe; the same applies here).
+- `RunnerStrings` finds the string table by value in the exe's data sections; a runner that keeps
+  it elsewhere refuses string relocations.
+- Plugins should not read files with a text-mode `std::ifstream` from `ModuleInitialize`: under
+  Wine 11 it faulted in the builtin `ucrtbase` (`_ungetc_nolock`). RunnerCompiler reads with Win32.
 
 ## Spike plugin (`RunnerCompiler/`, `build.sh`)
 
@@ -44,8 +134,10 @@ The plugin is read-only toward the game unless a link plan is installed. On load
   copies each matching entry's VMBuffer to `runnercompiler/capture/<name>.bin`, with metadata in
   `capture.tsv`. The list head is a static RVA (`0x8C9EC8`, RE/10), so the walk only runs when the
   exe's TimeDateStamp is `0x685E7007`. Otherwise it logs "named capture skipped";
-- if `mods/aurie/runnercompiler/link.txt` exists, it links and runs the `.gmlo` objects listed
-  there and skips the dump ("VM: running linked bytecode" below).
+- if `mods/aurie/runnercompiler/link.txt` exists, it runs the entries listed there through
+  `gmlrt::Runtime` and skips the dump: `.gmlo` objects are linked and run, `.gml` sources are
+  compiled in the game and run with `CompileAndRun` ("Runtime GML API", "VM: running linked
+  bytecode" below). Link mode works on VM and YYC runners.
 
 To disable it, rename `mods/aurie/RunnerCompiler.dll` to `RunnerCompiler.dll.off`.
 
@@ -301,7 +393,8 @@ Rules:
   call jumped into YYToolkit's data and crashed the game.
 - Snippets cannot declare functions yet (`GmlObjectCompiler` rejects child entries).
 
-Users: `compiler/RunnerCompiler` link mode (VM, below) and `modloader/yyc_vm_probe` (YYC).
+Users: `gmlrt::Runtime` ("Runtime GML API"), `compiler/RunnerCompiler` link mode (VM and YYC) and
+`modloader/yyc_vm_probe` (YYC).
 
 ## YYC: running linked bytecode (ROADMAP 4, YYC half)
 
@@ -418,8 +511,8 @@ to count the messages.
 - Only `call.i` is lowered. A script used as a value (`push.i` of a function id, e.g.
   `method(undefined, X)` or `callv` on it) is linked unchanged. It probably reaches the same
   faulting script path when called; this is untested.
-- The snippets run with the global instance as `self`. Instance variables on a real instance are
-  untested on YYC.
+- The probe's snippets run with the global instance as `self`. Instance variables on a real
+  instance were verified on YYC later by the `gmlrt_smoke` run ("Runtime GML API").
 - `RunnerStrings` assumes the runner keeps the image pointer and the table pointer in the exe's
   own data section. If either is missing, the linker refuses string relocations.
 
@@ -470,8 +563,8 @@ What the run showed:
 
 ### Link mode in the RunnerCompiler plugin
 
-`mods/aurie/runnercompiler/link.txt` lists objects (paths relative to that folder), run counts
-and checks:
+`mods/aurie/runnercompiler/link.txt` lists `.gmlo` objects or `.gml` sources (paths relative to
+that folder), run counts and checks:
 
 ```
 # <object> <runs> [check ; check ...]
@@ -516,14 +609,16 @@ calls `gml_Script_strlen`; the expected ids in the tests are the launcher's).
   script's `CCode` (script replacement) and calling linked code from other GML are not done.
 - Function declarations, `static`, and anything else that creates child entries are rejected
   by `GmlObjectCompiler`.
-- Snippets are compiled against a data.win offline. The in-process compiler
-  (`RuntimeExports.Compile`) does not emit `.gmlo` yet, so compile-in-game is still two steps.
+- ~~Compile-in-game is two steps.~~ `RuntimeExports.CompileObject` emits `.gmlo` in the game, and
+  `gmlrt::Runtime::CompileAndRun` does compile, link and run in one call ("Runtime GML API").
 - The memory figures are process-level; they show no growth per run, not a byte-exact
   accounting of the runner's heap.
 
 ## Generalizing
 
-Nothing in `ClrHost`, `RuntimeExports`, or the dump code is DELTARUNE-specific. The DELTARUNE
-parts are ImportLooseMod's folder conventions and the CheatMenu/SpriteInspector mods. To embed
-this in YYToolkit, it would ship `ClrHost` plus a C API, `YYTK::CompileGml(name, source)`, behind
-an optional dependency on the compiler folder.
+Nothing in `ClrHost`, `RuntimeExports`, `gmlrt::Runtime`, `gmlo::Linker` or the dump code is
+DELTARUNE-specific: the same plugin and plan ran on a VM and a YYC game. The DELTARUNE parts are
+ImportLooseMod's folder conventions and the CheatMenu/SpriteInspector mods. To embed this in
+YYToolkit, it would ship `ClrHost` plus a C API over `gmlrt::Runtime`
+(`YYTK::RunGml(source, self, result)`), behind an optional dependency on the compiler folder. The
+next step in this repo is one shared `Runtime` per process as an Aurie interface (ROADMAP 46).

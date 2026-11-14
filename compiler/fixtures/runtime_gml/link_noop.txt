@@ -1,0 +1,2 @@
+# memory control for link.txt: the same plan with an empty snippet
+gmlrt_noop.gml 1000 result 0

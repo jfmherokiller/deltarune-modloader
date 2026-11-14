@@ -1,8 +1,9 @@
 // Host test: start the self-contained compiler runtime in this process and call its exports.
-// usage: clrhost-test <compiler dir> [data.win code_name gml_file]
+// usage: clrhost-test <compiler dir> [data.win code_name gml_file [object]]
 #include "../native/ClrHost.hpp"
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <sstream>
 #include <vector>
@@ -27,13 +28,15 @@ int main(int argc, char** argv) {
     auto ms = [&] { return (long)std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - t0).count(); };
     printf("PING after %ld ms: %s\n", ms(), out.data());
     if (argc >= 5) {
-        auto compile = reinterpret_cast<CompileFn>(host.Function("LooseModCompiler.RuntimeExports, LooseModCompiler", "Compile"));
+        // 5th argument "object": CompileObject (.gmlo text, what gmlrt::Runtime calls) instead of Compile.
+        const bool object = argc >= 6 && strcmp(argv[5], "object") == 0;
+        auto compile = reinterpret_cast<CompileFn>(host.Function("LooseModCompiler.RuntimeExports, LooseModCompiler", object ? "CompileObject" : "Compile"));
         if (!compile) { fprintf(stderr, "FAIL: %s\n", host.Error().c_str()); return 1; }
         std::ifstream f(argv[4], std::ios::binary); std::stringstream src; src << f.rdbuf();
         for (int round = 0; round < 2; ++round) {
             t0 = std::chrono::steady_clock::now();
             int n = compile(argv[2], argv[3], src.str().c_str(), out.data(), (int)out.size());
-            printf("COMPILE round %d rc=%d after %ld ms\n%.*s\n", round, n, ms(), 600, out.data());
+            printf("COMPILE round %d rc=%d after %ld ms\n%.*s\n", round, n, ms(), object ? (int)out.size() : 600, out.data());
             if (n < 0) return 1;
         }
     }

@@ -15,6 +15,9 @@
 // The linked code is wrapped in a hand-built CCode/VMBuffer and run through YYTK
 // ExecuteCodeObject (the runner's own Code_Execute).
 //
+// Most callers want gml_runtime.hpp (gmlrt::Runtime), which adds the in-process compiler and one
+// CompileAndRun entry point on top of this linker.
+//
 // Everything runs on the game thread (from a YYTK callback). Linked code objects are never
 // freed: VMBuffer::Prepare caches the threaded form of a buffer keyed by its bytecode address,
 // so freeing a buffer and getting the same address back would run stale code. Link once, run
