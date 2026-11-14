@@ -115,6 +115,7 @@ drc_page_add = function(_scr, _top)
     array_push(drc_pages, { scr: _scr, top: _top, label: _info.label, why: _info.why, bw: _bw });
 };
 drc_page_add(scr_drcheat_page_money, 1);
+drc_page_add(scr_drcheat_page_lightworld, 0);   // right below the Dark World stat rows
 drc_page_add(scr_drcheat_page_inventory, 0);
 drc_page_add(scr_drcheat_page_enemies, 0);
 drc_page_add(scr_drcheat_page_recruits, 0);

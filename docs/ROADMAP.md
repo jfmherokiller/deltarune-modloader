@@ -79,6 +79,18 @@ BepInEx sits on top of its runtime libraries.
 
 ## Done (2026-11-13)
 
+- **CheatMenu Light World page (task 29).** F7 → **Light World...** edits `global.lhp`
+  (1..`lmaxhp`, no overheal), `lmaxhp` (1..999), `lat` and `ldf` (0..999), `llv` (1..20) and `lxp`
+  (0..99999). It lives in `scr_drcheat_page_lightworld`, and the side effects are in the page
+  header and in RESEARCH.md: nothing levels up in the Light World, and `scr_become_light`
+  recalculates `lhp` when Kris returns from the Dark World. Verified in Ch4 under Proton:
+  - Light World (a temporary save with `darkzone` 0 in Toriel's house): the page showed the STAT
+    screen's values (LV 1, HP 20/20, AT 10, DF 10, EXP 0). HP stopped at Max HP, and lowering Max
+    HP to 10 took HP with it. After the edits, the game's STAT screen showed LV 5, HP 10/30, AT 12,
+    DF 7, EXP 30 and NEXT 170.
+  - Dark World save: the page opens and edits without errors and shows the HP note.
+  - Ch1–5 compile with LooseModCompiler. The other chapters weren't run in-game.
+
 - **CheatMenu Money page (task 27).** F7 → **Money...** replaces the Gold row. The rows come
   from the `drc_money` table (now in `scr_drcheat_page_money`): D$ (`global.gold`), Light World $
   (`global.lgold`), PT (`flag[1044]`, Ch3–4, 0..9999), Board points (`flag[1117]`, Ch3), F$
@@ -209,8 +221,8 @@ locations and code-entry evidence for each one.
 28. **[feature] S: CheatMenu walk/run speed.** Multiply `obj_mainchara.bwspeed`; the game derives
     `wspeed` from it every step. Restore it on toggle-off and on room change. Platformer and
     climbing sections use other objects; check them separately.
-29. **[feature] S: CheatMenu Light World page.** `global.lhp`, `lmaxhp`, `lat`, `ldf`, `llv`, `lxp`
-    (and `lgold`, via task 27).
+29. ~~**[feature] S: CheatMenu Light World page.**~~ Done and verified in-game in Chapter 4
+    (see Done, 2026-11-13).
 30. **[feature] M: CheatMenu instant battle win.** Call `scr_wincombat`, which exists in every
     chapter. Skip the enemies in `scr_drcheat_nospare` (scripted fights). Check the rewards and flags
     the win screen sets.

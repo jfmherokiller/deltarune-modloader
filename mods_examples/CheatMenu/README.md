@@ -14,6 +14,7 @@ freezes and a cheat overlay opens.
 | Walk speed | Z or ←/→ cycles OFF / x1.5 / x2 / x3; stays active after closing and across rooms. Scales the overworld walk and run speed (`obj_mainchara.bwspeed`); OFF puts back the game's exact value. Platformer, wall climbing, dash mode, the Chapter 3 board and scripted slow-walk scenes keep their own speed |
 | Character | ←/→ picks the party member for the stat rows |
 | AT / DF / MAG / Max HP | ←/→ ±1 (Max HP ±10; Shift ×10) |
+| Light World... | Z opens Kris's Light World stats (below) |
 | Inventory... | Z opens the inventory editor (below) |
 | Enemies... | Z opens the enemy editor (below) |
 | Recruits... | Z opens per-enemy recruit counts (Chapters 2–5; below) |
@@ -84,6 +85,35 @@ The write is refused if the value changed after the prompt opened. Non-numeric v
 read-only. The page reads the flag count from `array_length(global.flag)`, so it never indexes
 past the current chapter's array. The page is raw story state: wrong values can break scenes,
 and lowering `plot` replays content.
+
+### Light World page
+
+Open **F7 → Light World...**. It shows and edits Kris's Light World stats. Use ↑/↓ to pick a row
+and ←/→ to change it. Hold Shift for the bigger step; the footer shows both steps. X goes back.
+
+| Row | Storage | Range | Step / Shift |
+|---|---|---|---|
+| HP | `global.lhp` | 1..Max HP | 1 / 10 |
+| Max HP | `global.lmaxhp` | 1..999 | 1 / 10 |
+| AT | `global.lat` | 0..999 | 1 / 10 |
+| DF | `global.ldf` | 0..999 | 1 / 10 |
+| LV | `global.llv` | 1..20 | 1 / 5 |
+| EXP | `global.lxp` | 0..99999 | 10 / 1000 |
+
+The edits show up in the Light World **STAT** screen and in the little menu box. They are saved
+with the game. Notes, all checked against the decompiled code in Chapters 1–5:
+
+- **No overheal.** HP can't go above Max HP. Lowering Max HP below HP lowers HP with it, the same
+  as the main page's Max HP row.
+- **LV and EXP are separate.** No code levels Kris up in the Light World, so changing EXP does
+  not change LV, and no other stat is recalculated. NEXT is worked out from LV and EXP when the
+  STAT screen is drawn. The game has a NEXT table for LV 1–19, and LV 20 or higher shows NEXT 0.
+  LV is also saved as the save file's *Love* value.
+- **AT and DF are only displayed.** There are no Light World battles.
+- **In the Dark World,** the page works and says that HP is recalculated. When Kris returns to
+  the Light World, `scr_become_light` sets HP from Kris's Dark World HP, which replaces an HP edit
+  made in the Dark World. Going the other way, `scr_become_dark` divides by Max HP, so Max HP is
+  never below 1.
 
 ### Money page
 
