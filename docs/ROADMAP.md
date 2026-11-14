@@ -97,6 +97,14 @@ BepInEx sits on top of its runtime libraries.
     crashed and no GML errors appeared.
   - Not covered: spending PT at Gerson's table in Ch4, and the `flag[1412] == 1` note, which
     needs a save from before the F$ reveal.
+- **RunnerCompiler live run (task 41, first half).** The spike plugin can now capture named code
+  entries: `capture.txt` holds name prefixes, and the plugin walks the runner's CCode list on the
+  first object event. Seven fixture snippets cover globals, instance variables, locals,
+  built-ins, script calls, strings and arrays. They were compiled into the launcher data.win as a
+  loose mod and captured live under Proton. The game did not crash. The pre-fixup and runtime
+  pairs, word-by-word listings and logs are in `compiler/fixtures/runtime_bytecode/`. Only operand
+  words of `pop`/`push`/`call`/`pushloc`/`pushglb`/`pushbltn` differ. Reproduce with
+  `compiler/RUNTIME_COMPILER.md` ("Live run and fixtures").
 
 ## Framework tasks
 
@@ -230,7 +238,8 @@ locations and code-entry evidence for each one.
     `Code_Execute` (events, global scripts). `gm::Observe("")` would add script calls on VM.
 40. **[feature] M: Cheat Engine dissector follow-ups.** Symbol lookup callback (`global.gold`) and
     array element expansion (`RE/TODO.md`).
-41. **[test] S: RunnerCompiler spike live run**, then `compiler/tools/compare_runtime_bytecode.py`
+41. **[test] S: ~~RunnerCompiler spike live run~~** (done, see Done 2026-11-13; fixtures in
+    `compiler/fixtures/runtime_bytecode/`), then `compiler/tools/compare_runtime_bytecode.py`
     to derive the load-time operand fixup. This is the first step of task 4.
 
 ## What goes upstream (proposed policy)

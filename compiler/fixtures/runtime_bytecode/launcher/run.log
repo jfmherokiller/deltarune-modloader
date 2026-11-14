@@ -1,0 +1,17 @@
+# aurie.log and mods/modloader.log lines from the live run (2026-11-13, Proton, launcher). Game path shown as <game>.
+[20:00:32.471 pid 408] cmdline: ./DELTARUNE.exe
+[20:00:32.472 pid 408] mod #0: CheatMenu (0 redirect(s))
+[20:00:32.472 pid 408] mod #1: DialogueBacklog (0 redirect(s))
+[20:00:32.472 pid 408] mod #2: RuntimeBytecodeFixtures (0 redirect(s))
+[20:00:32.472 pid 408] mod #3: SpriteInspector (0 redirect(s))
+[20:00:33.590 pid 408] loose GML: compiling <game>\mods\RuntimeBytecodeFixtures\. into <game>\data.win (LooseModCompiler.exe)
+[20:00:33.591 pid 408] CreateProcessW cmdline=""<game>\mods\tools\compiler\LooseModCompiler.exe" load "<game>\data.win" -s "<game>\mods\tools\ImportLooseMod.csx"" (wine fix not needed)
+[20:00:38.362 pid 408] loose GML: compiled OK in 4772 ms, 2956674 bytes served from memory
+[20:00:40] [info] [DeltaruneYYTK] step 0 | room PLACE_CHAPTER_SELECT_2x | chapter n/a | gold n/a | GML events so far 25
+[20:00:40] [info] [RunnerCompiler] ==== spike start, data.win <game>\data.win
+[20:00:40] [info] [RunnerCompiler] named capture: walked 352 of 352 CCode objects, 14 matched -> <game>\mods\aurie\runnercompiler\capture
+[20:00:40] [info] [RunnerCompiler] CLR up after 233 ms: LooseModCompiler runtime 10.0.14 in pid 408, Microsoft Windows 10.0.22000
+[20:00:40] [info] [RunnerCompiler] compile round 0 rc=413 in 152 ms: loaded <game>\data.win in 110 ms; compiled gml_Object_obj_time_Step_1 in 32 ms: 11 instructions, 64 bytes
+[20:00:40] [info] [RunnerCompiler] compile round 1 rc=327 in 1 ms: compiled gml_Object_obj_time_Step_1 in 1 ms: 11 instructions, 64 bytes
+[20:01:42] [info] [RunnerCompiler] bytecode dump: 14 scripts in <game>\mods\aurie\runnercompiler
+[20:02:23] [info] [DeltaruneYYTK] step 3000 | room PLACE_CHAPTER_SELECT_2x | chapter n/a | gold n/a | GML events so far 180025

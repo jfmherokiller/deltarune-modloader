@@ -1,0 +1,15 @@
+name	length	vm_f0c	vm_f10	ccode	vmbuffer	bytecode	script_index	locals	args	flags
+gml_GlobalScript_rcfx_strings	136	1	0	0x1029d00	0x325b00	0x31bb6cc	295	1	0	0x0
+gml_GlobalScript_rcfx_scripts	144	1	0	0x102a200	0x325b40	0x31bb63c	293	1	0	0x0
+gml_GlobalScript_rcfx_locals	220	1	0	0x102a600	0x325b80	0x31bb560	291	1	0	0x0
+gml_GlobalScript_rcfx_instance	172	1	0	0x102ab00	0x325bc0	0x31bb4b4	289	1	0	0x0
+gml_GlobalScript_rcfx_globals	112	1	0	0x102af00	0x325c00	0x31bb444	287	1	0	0x0
+gml_GlobalScript_rcfx_builtins	188	1	0	0x102b400	0x325c40	0x31bb388	285	1	0	0x0
+gml_GlobalScript_rcfx_arrays	272	1	0	0x102b700	0x325c80	0x31bb278	283	1	0	0x0
+gml_Script_rcfx_strings	136	1	0	0x103c900	0x326a80	0x31bb6cc	296	1	0	0x0
+gml_Script_rcfx_scripts	144	2	0	0x103ca00	0x326ac0	0x31bb63c	294	2	0	0x0
+gml_Script_rcfx_locals	220	4	1	0x103cb00	0x326b00	0x31bb560	292	4	1	0x0
+gml_Script_rcfx_instance	172	0	0	0x103cc00	0x326b40	0x31bb4b4	290	0	0	0x0
+gml_Script_rcfx_globals	112	0	0	0x103cd00	0x326b80	0x31bb444	288	0	0	0x0
+gml_Script_rcfx_builtins	188	1	0	0x103ce00	0x326bc0	0x31bb388	286	1	0	0x0
+gml_Script_rcfx_arrays	272	1	0	0x103cf00	0x326c00	0x31bb278	284	1	0	0x0

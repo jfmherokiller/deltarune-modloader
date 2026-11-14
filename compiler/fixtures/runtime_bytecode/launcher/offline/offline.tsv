@@ -1,0 +1,15 @@
+name	file_offset	length	locals	args	child_offset	runtime_length	differing_words
+gml_GlobalScript_rcfx_arrays	0x3b218	272	1	0	0	272	13
+gml_GlobalScript_rcfx_builtins	0x3b328	188	1	0	0	188	13
+gml_GlobalScript_rcfx_globals	0x3b3e4	112	1	0	0	112	7
+gml_GlobalScript_rcfx_instance	0x3b454	172	1	0	0	172	14
+gml_GlobalScript_rcfx_locals	0x3b500	220	1	0	0	220	17
+gml_GlobalScript_rcfx_scripts	0x3b5dc	144	1	0	0	144	10
+gml_GlobalScript_rcfx_strings	0x3b66c	136	1	0	0	136	7
+gml_Script_rcfx_arrays	0x3b218	272	1	0	4	272	13
+gml_Script_rcfx_builtins	0x3b328	188	1	0	4	188	13
+gml_Script_rcfx_globals	0x3b3e4	112	0	0	4	112	7
+gml_Script_rcfx_instance	0x3b454	172	0	0	4	172	14
+gml_Script_rcfx_locals	0x3b500	220	4	1	4	220	17
+gml_Script_rcfx_scripts	0x3b5dc	144	2	0	4	144	10
+gml_Script_rcfx_strings	0x3b66c	136	1	0	4	136	7

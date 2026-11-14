@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """compare_runtime_bytecode.py - diff the runner's in-memory bytecode against the data.win it was served.
 
-usage: compare_runtime_bytecode.py <data.win as served> <dump dir with index.tsv + *.bin>
+usage: compare_runtime_bytecode.py <data.win as served> <dump dir with index.tsv or capture.tsv + *.bin>
 
 The RunnerCompiler spike plugin dumps CCode->VMBuffer bytecode. The runner points VMBuffer.bytecode
 into the loaded data.win and rewrites operands in place while loading the CODE chunk. This tool
 finds each dumped script's bytes in the served data.win (CODE entry: bytecode = entry + 12 +
-relAddr, GMS2.3+ layout) and reports which instruction words changed, grouped by opcode, so the
+relAddr, GMS2.3+ layout; child functions such as gml_Script_* share their parent's buffer, and the
+runner's VMBuffer for them is the whole parent buffer, not parent + child offset) and reports which instruction words changed, grouped by opcode, so the
 fixup that injected bytecode must reproduce can be read off directly.
 """
 import collections, os, struct, sys
@@ -18,6 +19,14 @@ OPS = {0x07: "conv", 0x08: "mul", 0x09: "div", 0x0A: "rem", 0x0B: "mod", 0x0C: "
        0xB6: "b", 0xB7: "bt", 0xB8: "bf", 0xBA: "pushenv", 0xBB: "popenv", 0xC0: "push", 0xC1: "pushloc",
        0xC2: "pushglb", 0xC3: "pushbltn", 0x84: "pushi", 0xD9: "call", 0x99: "callv", 0xFF: "break"}
 DATA_TYPE_SIZE = {0: 8, 1: 4, 2: 4, 3: 8, 4: 4, 5: 4, 6: 4, 15: 2}  # double,float,int,long,bool,var,string,int16
+
+
+def load_data(path):
+    """data.win bytes; also accepts a DR_OUT_PIPE capture (8-byte length prefix + data.win)."""
+    d = open(path, "rb").read()
+    if d[:4] != b"FORM" and d[8:12] == b"FORM":
+        d = d[8:]
+    return d
 
 
 def chunks(d):
@@ -33,17 +42,23 @@ def cstring(d, ptr):
     return d[ptr:end].decode("utf-8", "replace")
 
 
-def code_entries(d):
+def code_entries(d, with_meta=False):
+    """name -> (bytecode file offset, length). The offset is the start of the (parent) buffer, which is
+    what the runner's VMBuffer points at; with_meta adds (locals, args, child offset)."""
     start, size = chunks(d)["CODE"]
     count = struct.unpack_from("<I", d, start)[0]
     entries = {}
     for i in range(count):
         e = struct.unpack_from("<I", d, start + 4 + 4 * i)[0]
-        name_ptr, length = struct.unpack_from("<II", d, e)
+        name_ptr, length, locals_, args = struct.unpack_from("<IIHH", d, e)
         rel = struct.unpack_from("<i", d, e + 12)[0]
         offset = struct.unpack_from("<I", d, e + 16)[0]
-        entries[cstring(d, name_ptr)] = (e + 12 + rel + offset, length)
+        entries[cstring(d, name_ptr)] = (e + 12 + rel, length, locals_, args, offset) if with_meta else (e + 12 + rel, length)
     return entries
+
+
+def safe_name(name):
+    return "".join(c if c.isalnum() or c in "_-" else "_" for c in name)
 
 
 def instruction_words(code):
@@ -63,16 +78,19 @@ def instruction_words(code):
 
 def main():
     served, dump_dir = sys.argv[1], sys.argv[2]
-    d = open(served, "rb").read()
+    d = load_data(served)
     entries = code_entries(d)
-    rows = [l.rstrip("\n").split("\t") for l in open(os.path.join(dump_dir, "index.tsv"), encoding="utf-8")][1:]
+    index = os.path.join(dump_dir, "index.tsv")
+    if not os.path.exists(index):
+        index = os.path.join(dump_dir, "capture.tsv")
+    rows = [l.rstrip("\r\n").split("\t") for l in open(index, encoding="utf-8")][1:]
     same = changed = missing = 0
     by_op = collections.Counter(); examples = collections.defaultdict(list); size_mismatch = []
     for name, length, *_ in rows:
         if name not in entries:
             missing += 1; continue
         off, flen = entries[name]
-        runtime = open(os.path.join(dump_dir, "".join(c if c.isalnum() or c in "_-" else "_" for c in name) + ".bin"), "rb").read()
+        runtime = open(os.path.join(dump_dir, safe_name(name) + ".bin"), "rb").read()
         if len(runtime) != flen:
             size_mismatch.append((name, flen, len(runtime))); continue
         original = d[off:off + flen]

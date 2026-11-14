@@ -10,6 +10,8 @@ the loader used before).
 | `LooseModCompiler/RuntimeExports.cs` | `[UnmanagedCallersOnly]` entry points (`Ping`, `Compile`) for native hosts. |
 | `RunnerCompiler/` | SPIKE: YYToolkit plugin that hosts the same .NET runtime in the game process. See `RUNTIME_COMPILER.md`. |
 | `tools/compare_runtime_bytecode.py` | Diffs the runner's in-memory bytecode (spike dump) against the data.win it was served. |
+| `tools/runtime_bytecode_fixtures.py` | Pairs a spike named capture with the served data.win: offline/runtime `.bin` files and side-by-side listings. |
+| `fixtures/runtime_bytecode/` | Live-captured runtime vs. pre-fixup bytecode for seven GML snippets (ROADMAP 41). |
 
 ## Build / install
 

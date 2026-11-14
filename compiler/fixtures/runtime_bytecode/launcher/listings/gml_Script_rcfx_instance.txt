@@ -1,0 +1,60 @@
+# gml_Script_rcfx_instance
+# file offset 0x3b454, length 172, locals 0, args 0, child offset 4
+# columns: byte offset, opcode, operand word index, file word, runtime word
+#
+# source:
+#   function rcfx_instance()
+#   {
+#       x = 10;
+#       y += x;
+#       image_alpha = 0.5;
+#       rcfx_inst = x + y;
+#       other.rcfx_other = rcfx_inst;
+#       return rcfx_inst;
+#   }
+
+    0  b         w0  b600001f  b600001f
+    4  pushi     w0  840f000a  840f000a
+    8  pop       w0  4525ffff  4525ffff
+   12            w1  a0000010  a0000000  *
+   16  push      w0  c005ffff  c005ffff
+   20            w1  a0000014  a0000001  *
+   24  push      w0  c005ffff  c005ffff
+   28            w1  a0000028  a0000000  *
+   32  add       w0  0c550000  0c550000
+   36  pop       w0  4555ffff  4555ffff
+   40            w1  a0000024  a0000001  *
+   44  push      w0  c0000000  c0000000
+   48            w1  00000000  00000000
+   52            w2  3fe00000  3fe00000
+   56  pop       w0  4505ffff  4505ffff
+   60            w1  a0000490  a0000025  *
+   64  push      w0  c005ffff  c005ffff
+   68            w1  a00001fe  a0000000  *
+   72  push      w0  c005ffff  c005ffff
+   76            w1  a00001fd  a0000001  *
+   80  add       w0  0c550000  0c550000
+   84  pop       w0  4555ffff  4555ffff
+   88            w1  a0000008  a0018864  *
+   92  push      w0  c005ffff  c005ffff
+   96            w1  a0000010  a0018864  *
+  100  pop       w0  4555fffe  4555fffe
+  104            w1  a0000492  a0018865  *
+  108  push      w0  c005ffff  c005ffff
+  112            w1  a0000491  a0018864  *
+  116  ret       w0  9c050000  9c050000
+  120  exit      w0  9d020000  9d020000
+  124  push      w0  c0020000  c0020000
+  128            w1  00000482  00018790  *
+  132  conv      w0  07520000  07520000
+  136  pushi     w0  840fffff  840fffff
+  140  conv      w0  07520000  07520000
+  144  call      w0  d9020002  d9020002
+  148            w1  000000dc  000000a2  *
+  152  dup?      w0  86050000  86050000
+  156  pushi     w0  840fffff  840fffff
+  160  pop       w0  45550000  45550000
+  164            w1  80000493  80018866  *
+  168  popz      w0  9e050000  9e050000
+
+# 14 differing word(s)

@@ -1,0 +1,48 @@
+# gml_Script_rcfx_strings
+# file offset 0x3b66c, length 136, locals 1, args 0, child offset 4
+# columns: byte offset, opcode, operand word index, file word, runtime word
+#
+# source:
+#   function rcfx_strings()
+#   {
+#       var s = "rcfx hello";
+#       s += " world";
+#       return s + "rcfx_unique_suffix" + "rcfx hello";
+#   }
+
+    0  b         w0  b6000016  b6000016
+    4  push      w0  c0060000  c0060000
+    8            w1  0000049c  0000049c
+   12  pop       w0  4565fff9  4565fff9
+   16            w1  a0000008  a001886e  *
+   20  push      w0  c005fff9  c005fff9
+   24            w1  a0000014  a001886e  *
+   28  push      w0  c0060000  c0060000
+   32            w1  0000049d  0000049d
+   36  add       w0  0c560000  0c560000
+   40  pop       w0  4555fff9  4555fff9
+   44            w1  a0000008  a001886e  *
+   48  pushloc   w0  c105fff9  c105fff9
+   52            w1  a000049f  a001886e  *
+   56  push      w0  c0060000  c0060000
+   60            w1  0000049e  0000049e
+   64  add       w0  0c560000  0c560000
+   68  push      w0  c0060000  c0060000
+   72            w1  0000049c  0000049c
+   76  add       w0  0c560000  0c560000
+   80  ret       w0  9c050000  9c050000
+   84  exit      w0  9d020000  9d020000
+   88  push      w0  c0020000  c0020000
+   92            w1  00000485  00018793  *
+   96  conv      w0  07520000  07520000
+  100  pushi     w0  840fffff  840fffff
+  104  conv      w0  07520000  07520000
+  108  call      w0  d9020002  d9020002
+  112            w1  00000011  000000a2  *
+  116  dup?      w0  86050000  86050000
+  120  pushi     w0  840fffff  840fffff
+  124  pop       w0  45550000  45550000
+  128            w1  8000049b  8001886d  *
+  132  popz      w0  9e050000  9e050000
+
+# 7 differing word(s)

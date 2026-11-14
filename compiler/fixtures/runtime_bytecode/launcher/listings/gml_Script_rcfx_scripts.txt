@@ -1,0 +1,50 @@
+# gml_Script_rcfx_scripts
+# file offset 0x3b5dc, length 144, locals 2, args 0, child offset 4
+# columns: byte offset, opcode, operand word index, file word, runtime word
+#
+# source:
+#   function rcfx_scripts()
+#   {
+#       var len = strlen("abcd");
+#       var v = rcfx_locals(len);
+#       return scr_wrap(v, 0, 10);
+#   }
+
+    0  b         w0  b6000018  b6000018
+    4  push      w0  c0060000  c0060000
+    8            w1  00000499  00000499
+   12  conv      w0  07560000  07560000
+   16  call      w0  d9020001  d9020001
+   20            w1  00000027  000186f1  *
+   24  pop       w0  4555fff9  4555fff9
+   28            w1  a0000008  a001878c  *
+   32  pushloc   w0  c105fff9  c105fff9
+   36            w1  a00001eb  a001878c  *
+   40  call      w0  d9020001  d9020001
+   44            w1  00000483  00018791  *
+   48  pop       w0  4555fff9  4555fff9
+   52            w1  a0000018  a001886c  *
+   56  pushi     w0  840f000a  840f000a
+   60  conv      w0  07520000  07520000
+   64  pushi     w0  840f0000  840f0000
+   68  conv      w0  07520000  07520000
+   72  pushloc   w0  c105fff9  c105fff9
+   76            w1  a000049a  a001886c  *
+   80  call      w0  d9020003  d9020003
+   84            w1  000000f2  000186d9  *
+   88  ret       w0  9c050000  9c050000
+   92  exit      w0  9d020000  9d020000
+   96  push      w0  c0020000  c0020000
+  100            w1  00000484  00018792  *
+  104  conv      w0  07520000  07520000
+  108  pushi     w0  840fffff  840fffff
+  112  conv      w0  07520000  07520000
+  116  call      w0  d9020002  d9020002
+  120            w1  00000088  000000a2  *
+  124  dup?      w0  86050000  86050000
+  128  pushi     w0  840fffff  840fffff
+  132  pop       w0  45550000  45550000
+  136            w1  80000498  8001886b  *
+  140  popz      w0  9e050000  9e050000
+
+# 10 differing word(s)

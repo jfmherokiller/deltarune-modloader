@@ -1,0 +1,71 @@
+# gml_GlobalScript_rcfx_locals
+# file offset 0x3b500, length 220, locals 1, args 0, child offset 0
+# columns: byte offset, opcode, operand word index, file word, runtime word
+#
+# source:
+#   function rcfx_locals(base)
+#   {
+#       var a = 1, b = 2;
+#       var c = a + b + base;
+#       for (var i = 0; i < 3; i++)
+#           c += i;
+#       return c;
+#   }
+
+    0  b         w0  b600002b  b600002b
+    4  pushi     w0  840f0001  840f0001
+    8  pop       w0  4525fff9  4525fff9
+   12            w1  a0000014  a0018868  *
+   16  pushi     w0  840f0002  840f0002
+   20  pop       w0  4525fff9  4525fff9
+   24            w1  a0000010  a0018869  *
+   28  pushloc   w0  c105fff9  c105fff9
+   32            w1  a0000495  a0018868  *
+   36  pushloc   w0  c105fff9  c105fff9
+   40            w1  a0000496  a0018869  *
+   44  add       w0  0c550000  0c550000
+   48  push      w0  c005fff1  c005fff1
+   52            w1  a0000004  a000005d  *
+   56  add       w0  0c550000  0c550000
+   60  pop       w0  4555fff9  4555fff9
+   64            w1  a0000028  a001886a  *
+   68  pushi     w0  840f0000  840f0000
+   72  pop       w0  4525fff9  4525fff9
+   76            w1  a0000008  a00186d1  *
+   80  pushloc   w0  c105fff9  c105fff9
+   84            w1  a000001c  a00186d1  *
+   88  pushi     w0  840f0003  840f0003
+   92  cmp       w0  15520100  15520100
+   96  bf        w0  b800000f  b800000f
+  100  push      w0  c005fff9  c005fff9
+  104            w1  a0000014  a001886a  *
+  108  pushloc   w0  c105fff9  c105fff9
+  112            w1  a0000014  a00186d1  *
+  116  add       w0  0c550000  0c550000
+  120  pop       w0  4555fff9  4555fff9
+  124            w1  a0000024  a001886a  *
+  128  push      w0  c005fff9  c005fff9
+  132            w1  a0000010  a00186d1  *
+  136  push      w0  c00f0001  c00f0001
+  140  add       w0  0c520000  0c520000
+  144  pop       w0  4555fff9  4555fff9
+  148            w1  a000008b  a00186d1  *
+  152  b         w0  b67fffee  b67fffee
+  156  pushloc   w0  c105fff9  c105fff9
+  160            w1  a0000497  a001886a  *
+  164  ret       w0  9c050000  9c050000
+  168  exit      w0  9d020000  9d020000
+  172  push      w0  c0020000  c0020000
+  176            w1  00000058  00018791  *
+  180  conv      w0  07520000  07520000
+  184  pushi     w0  840fffff  840fffff
+  188  conv      w0  07520000  07520000
+  192  call      w0  d9020002  d9020002
+  196            w1  00000090  000000a2  *
+  200  dup?      w0  86050000  86050000
+  204  pushi     w0  840fffff  840fffff
+  208  pop       w0  45550000  45550000
+  212            w1  80000494  80018867  *
+  216  popz      w0  9e050000  9e050000
+
+# 17 differing word(s)

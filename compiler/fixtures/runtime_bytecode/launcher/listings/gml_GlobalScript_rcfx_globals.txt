@@ -1,0 +1,42 @@
+# gml_GlobalScript_rcfx_globals
+# file offset 0x3b3e4, length 112, locals 1, args 0, child offset 0
+# columns: byte offset, opcode, operand word index, file word, runtime word
+#
+# source:
+#   function rcfx_globals()
+#   {
+#       global.rcfx_counter = 5;
+#       global.rcfx_counter += 1;
+#       return global.rcfx_counter * 2;
+#   }
+
+    0  b         w0  b6000010  b6000010
+    4  pushi     w0  840f0005  840f0005
+    8  pop       w0  4525fffb  4525fffb
+   12            w1  a0000008  a0018862  *
+   16  push      w0  c005fffb  c005fffb
+   20            w1  a0000010  a0018862  *
+   24  pushi     w0  840f0001  840f0001
+   28  add       w0  0c520000  0c520000
+   32  pop       w0  4555fffb  4555fffb
+   36            w1  a0000008  a0018862  *
+   40  pushglb   w0  c205fffb  c205fffb
+   44            w1  a000048e  a0018862  *
+   48  pushi     w0  840f0002  840f0002
+   52  mul       w0  08520000  08520000
+   56  ret       w0  9c050000  9c050000
+   60  exit      w0  9d020000  9d020000
+   64  push      w0  c0020000  c0020000
+   68            w1  00000481  0001878f  *
+   72  conv      w0  07520000  07520000
+   76  pushi     w0  840fffff  840fffff
+   80  conv      w0  07520000  07520000
+   84  call      w0  d9020002  d9020002
+   88            w1  000000ac  000000a2  *
+   92  dup?      w0  86050000  86050000
+   96  pushi     w0  840fffff  840fffff
+  100  pop       w0  45550000  45550000
+  104            w1  8000048f  80018863  *
+  108  popz      w0  9e050000  9e050000
+
+# 7 differing word(s)

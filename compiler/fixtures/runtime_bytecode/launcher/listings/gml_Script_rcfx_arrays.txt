@@ -1,0 +1,84 @@
+# gml_Script_rcfx_arrays
+# file offset 0x3b218, length 272, locals 1, args 0, child offset 4
+# columns: byte offset, opcode, operand word index, file word, runtime word
+#
+# source:
+#   function rcfx_arrays()
+#   {
+#       var arr = [1, 2, 3];
+#       arr[3] = 4;
+#       global.rcfx_arr[0] = 7;
+#       rcfx_inst_arr[1] = arr[2];
+#       return array_length(arr) + arr[1] + global.rcfx_arr[0];
+#   }
+
+    0  b         w0  b6000038  b6000038
+    4  push      w0  c0020000  c0020000
+    8            w1  735ed0ac  735ed0ac
+   12  break     w0  ff0ffffb  ff0ffffb
+   16  pushi     w0  840f0003  840f0003
+   20  conv      w0  07520000  07520000
+   24  pushi     w0  840f0002  840f0002
+   28  conv      w0  07520000  07520000
+   32  pushi     w0  840f0001  840f0001
+   36  conv      w0  07520000  07520000
+   40  call      w0  d9020003  d9020003
+   44            w1  00000033  000008cd  *
+   48  pop       w0  4555fff9  4555fff9
+   52            w1  a0000070  a001885c  *
+   56  pushi     w0  840f0004  840f0004
+   60  conv      w0  07520000  07520000
+   64  pushi     w0  840ffff9  840ffff9
+   68  pushi     w0  840f0003  840f0003
+   72  pop       w0  45550000  45550000
+   76            w1  00000040  0001885c  *
+   80  push      w0  c0020000  c0020000
+   84            w1  7360d0ad  7360d0ad
+   88  break     w0  ff0ffffb  ff0ffffb
+   92  pushi     w0  840f0007  840f0007
+   96  conv      w0  07520000  07520000
+  100  pushi     w0  840ffffb  840ffffb
+  104  pushi     w0  840f0000  840f0000
+  108  pop       w0  45550000  45550000
+  112            w1  00000060  0001885d  *
+  116  push      w0  c0020000  c0020000
+  120            w1  735ed0ae  735ed0ae
+  124  break     w0  ff0ffffb  ff0ffffb
+  128  pushi     w0  840ffff9  840ffff9
+  132  pushi     w0  840f0002  840f0002
+  136  push      w0  c0050000  c0050000
+  140            w1  00000030  0001885c  *
+  144  pushi     w0  840fffff  840fffff
+  148  pushi     w0  840f0001  840f0001
+  152  pop       w0  45550000  45550000
+  156            w1  00000488  0001885e  *
+  160  pushloc   w0  c105fff9  c105fff9
+  164            w1  a0000486  a001885c  *
+  168  call      w0  d9020001  d9020001
+  172            w1  000000dd  000000aa  *
+  176  pushi     w0  840ffff9  840ffff9
+  180  pushi     w0  840f0001  840f0001
+  184  push      w0  c0050000  c0050000
+  188            w1  00000486  0001885c  *
+  192  add       w0  0c550000  0c550000
+  196  pushi     w0  840ffffb  840ffffb
+  200  pushi     w0  840f0000  840f0000
+  204  push      w0  c0050000  c0050000
+  208            w1  00000487  0001885d  *
+  212  add       w0  0c550000  0c550000
+  216  ret       w0  9c050000  9c050000
+  220  exit      w0  9d020000  9d020000
+  224  push      w0  c0020000  c0020000
+  228            w1  0000047f  0001878d  *
+  232  conv      w0  07520000  07520000
+  236  pushi     w0  840fffff  840fffff
+  240  conv      w0  07520000  07520000
+  244  call      w0  d9020002  d9020002
+  248            w1  000000bc  000000a2  *
+  252  dup?      w0  86050000  86050000
+  256  pushi     w0  840fffff  840fffff
+  260  pop       w0  45550000  45550000
+  264            w1  80000489  8001885f  *
+  268  popz      w0  9e050000  9e050000
+
+# 13 differing word(s)
