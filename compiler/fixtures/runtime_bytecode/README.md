@@ -18,6 +18,7 @@ All snippets are our own code. No game bytecode is stored here.
 | `launcher/runtime/capture.tsv` | Per entry: VMBuffer length, VMBuffer `+0x0c`/`+0x10`, CCode/VMBuffer/bytecode addresses, CCode script index, locals, args, flags. |
 | `launcher/listings/<entry>.txt` | Source, then every instruction word side by side (file, runtime). Differing words are marked `*`. |
 | `launcher/run.log` | The loader and RunnerCompiler log lines from the capture run. |
+| `launcher/links.json` | Relocations of every entry plus each referenced name's runtime id (`bytecode_fixup.py links`). The fixup test uses it, so it needs no data.win. |
 
 Each snippet is a global script with one function, so the data.win holds two code entries per
 snippet: `gml_GlobalScript_rcfx_<x>` (the parent, which only defines the function) and

@@ -139,7 +139,10 @@ BepInEx sits on top of its runtime libraries.
 4. **[feature] L: runtime linking of compiled GML.** Turn Underanalyzer output into a runnable
    `CCode`: rewrite variable, built-in and string operands to runtime ids, and route script calls
    through `script_execute`. Shared by VM and YYC (`compiler/RUNTIME_COMPILER.md`,
-   `modloader/yyc_vm_probe`).
+   `modloader/yyc_vm_probe`). The VM load-time fixup is derived and tested. Only variable and
+   function operands are rewritten, and string indices are kept. Rules: RUNTIME_COMPILER.md
+   "Load-time operand fixup". Code: `compiler/tools/bytecode_fixup.py`. Still to do: the live
+   resolver backed by the runner's tables, and the injection itself.
 5. **[feature] M: generic loose-asset overrides.** Find `ReadEntireFile` by signature instead of
    by RVA, so the data.win redirect works in other VM games. YYC data.win still holds sprites,
    sounds and strings, so asset mods would also work on YYC games.

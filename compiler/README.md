@@ -12,6 +12,8 @@ the loader used before).
 | `tools/compare_runtime_bytecode.py` | Diffs the runner's in-memory bytecode (spike dump) against the data.win it was served. |
 | `tools/runtime_bytecode_fixtures.py` | Pairs a spike named capture with the served data.win: offline/runtime `.bin` files and side-by-side listings. |
 | `fixtures/runtime_bytecode/` | Live-captured runtime vs. pre-fixup bytecode for seven GML snippets (ROADMAP 41). |
+| `tools/bytecode_fixup.py` | The runner's load-time operand fixup (variable/function ids), see RUNTIME_COMPILER.md. |
+| `tests/` | `python3 -m unittest discover -s compiler/tests`: fixup vs. the runtime fixtures, byte for byte. |
 
 ## Build / install
 

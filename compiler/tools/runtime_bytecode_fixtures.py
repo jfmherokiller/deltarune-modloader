@@ -8,7 +8,8 @@ usage: runtime_bytecode_fixtures.py <served data.win> <capture dir> <out dir> [-
 <capture dir>      RunnerCompiler named-capture output (capture.tsv + <name>.bin), i.e.
                    <game>/mods/aurie/runnercompiler/capture
 <out dir>          written: runtime/ (capture copied), offline/ (same entries cut from the data.win,
-                   pre-fixup, plus offline.tsv), listings/<entry>.txt (word-by-word side by side).
+                   pre-fixup, plus offline.tsv), listings/<entry>.txt (word-by-word side by side),
+                   links.json (relocations and runtime ids, see bytecode_fixup.py).
 --source           folder with the gml_*.gml sources, quoted at the top of each listing.
 
 The offline bytes are what Underanalyzer (LooseModCompiler) emitted; the runtime bytes are the same
@@ -19,11 +20,7 @@ import os, shutil, struct, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from compare_runtime_bytecode import OPS, code_entries, instruction_words, load_data, safe_name  # noqa: E402
-
-
-def read_tsv(path):
-    lines = [l.rstrip("\r\n").split("\t") for l in open(path, encoding="utf-8") if l.strip()]
-    return [dict(zip(lines[0], row)) for row in lines[1:]]
+from bytecode_fixup import build_links, dump_links, read_tsv  # noqa: E402
 
 
 def listing(name, offline, runtime, meta, source):
@@ -81,6 +78,10 @@ def main():
         offline_rows.append(f"{name}\t0x{off:x}\t{length}\t{locals_}\t{args_}\t{child}\t{len(runtime)}\t{differing}")
         print(f"{name}: {len(runtime)} bytes, {differing} differing word(s)")
     open(os.path.join(out_dir, "offline", "offline.tsv"), "w", encoding="utf-8").write("\n".join(offline_rows) + "\n")
+    links = build_links(d, out_dir)
+    with open(os.path.join(out_dir, "links.json"), "w", encoding="utf-8", newline="\n") as f:
+        f.write(dump_links(links))
+    print(f"links.json: {sum(len(e['relocs']) for e in links['entries'].values())} relocations")
 
 
 if __name__ == "__main__":
