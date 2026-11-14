@@ -1,0 +1,3 @@
+repeat 100
+global_eq_script gmlo_script_result gml_Script___spelunker_minutes_to_seconds 2
+global_eq_script gmlo_script_total gml_Script___spelunker_minutes_to_seconds 6

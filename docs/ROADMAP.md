@@ -141,8 +141,12 @@ BepInEx sits on top of its runtime libraries.
    through `script_execute`. Shared by VM and YYC (`compiler/RUNTIME_COMPILER.md`,
    `modloader/yyc_vm_probe`). The VM load-time fixup is derived and tested. Only variable and
    function operands are rewritten, and string indices are kept. Rules: RUNTIME_COMPILER.md
-   "Load-time operand fixup". Code: `compiler/tools/bytecode_fixup.py`. Still to do: the live
-   resolver backed by the runner's tables, and the injection itself.
+   "Load-time operand fixup". Code: `compiler/tools/bytecode_fixup.py`. YYC half done
+   (2026-11-14): `compiler/GmlObjectCompiler` output is linked in-process by
+   `modloader/include/gmlo_link.hpp` (runner tables, string-table append, script calls lowered to
+   `script_execute`) and runs on Dwarf Eats Mountain's embedded VM; four snippets × 300 runs pass
+   (RUNTIME_COMPILER.md "YYC: running linked bytecode"). Still to do: the VM half and one API for
+   both.
 5. **[feature] M: generic loose-asset overrides.** Find `ReadEntireFile` by signature instead of
    by RVA, so the data.win redirect works in other VM games. YYC data.win still holds sprites,
    sounds and strings, so asset mods would also work on YYC games.

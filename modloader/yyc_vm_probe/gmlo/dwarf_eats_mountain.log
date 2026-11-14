@@ -1,0 +1,59 @@
+[01:27:55.866] YYCVmProbe start
+[01:28:00.921] IsYYCRunner() = 1
+[01:28:00.921] push.d 42; conv.d.v; ret.v: Code_Execute returned 1; result kind number value 42; converted buffer 0000000005F994E0
+[01:28:00.921] sqr index 234
+[01:28:00.921] sqr(7) via call.i: Code_Execute returned 1; result kind number value 49; converted buffer 0000000006389F40
+[01:28:00.921] getPriestCount id 104592, script_execute index 804
+[01:28:00.921] script_execute(getPriestCount) via call.i: Code_Execute returned 1; result kind number value 0; converted buffer 0000000001F75F00
+[01:28:00.921] global.sparkle_budget_cap: YYTK reads 60, slot 106899
+[01:28:00.921] push.v global.<slot>; ret.v: Code_Execute returned 1; result kind number value 60; converted buffer 000000000249D5A0
+[01:28:00.921] pop.v.v global.<slot> = 123: Code_Execute returned 1; result kind undefined value undefined; converted buffer 0000000001F5A240
+[01:28:00.921] global.sparkle_budget_cap after bytecode write, read by YYTK: 123
+[01:28:00.921] restore original value: Code_Execute returned 1; result kind undefined value undefined; converted buffer 0000000006384B00
+[01:28:00.927] GMLO: show_debug_message hook at 0000000140F0DA70: AURIE_SUCCESS
+[01:28:00.954] GMLO: runner string table: image 00000000028E0060, table slot 0000000141B6F780 -> 000000000294B86C, 15096 strings; push.s 0 = ''
+[01:28:00.954] GMLO gmlo_builtin: linked 7 words (3 relocations, 0 script calls lowered, 0 new strings): c305fffa a000008b 4555fffb a001b21b c305fffa a000008b 9c050000
+[01:28:00.956] GMLO gmlo_debug: linked 47 words (17 relocations, 0 script calls lowered, 1 new strings): 840f0000 4525fff9 a001a434 840f0000 4525fff9 a001a430 c105fff9 a001a430 840f0004 15520100 b800000f c005fff9 a001a434 c105fff9 a001a430 0c550000 4555fff9 a001a434 c005fff9 a001a430 c00f0001 0c520000 4555fff9 a001a430 b67fffee c0060000 00003af8 c105fff9 a001a434 d9020001 0000010a 0c650000 d9020001 00000500 9e050000 c0060000 00003af8 c105fff9 a001a434 d9020001 0000010a 0c650000 4555fffb a001b21c c105fff9 a001a434 9c050000
+[01:28:00.967] GMLO gmlo_globals: linked 14 words (4 relocations, 0 script calls lowered, 0 new strings): 840f0005 4525fffb a001b21d c005fffb a001b21d 840f0001 0c520000 4555fffb a001b21d c205fffb a001b21d 840f0002 08520000 9c050000
+[01:28:00.967] GMLO gmlo_script: linked 52 words (16 relocations, 2 script calls lowered, 0 new strings): 840f0000 4525fff9 a001a2da 840f0001 4525fff9 a001a432 c105fff9 a001a432 840f0003 15520200 b8000014 c005fff9 a001a2da c105fff9 a001a432 c0020000 00019800 07520000 d9020002 00000324 0c550000 4555fff9 a001a2da c005fff9 a001a432 c00f0001 0c520000 4555fff9 a001a432 b67fffe9 c105fff9 a001a2da 4555fffb a001b21e 840f0002 07520000 c0020000 00019800 07520000 d9020002 00000324 4555fff9 a001b21f c105fff9 a001b21f 4555fffb a001b220 c105fff9 a001b21f 840f0001 0c520000 9c050000
+[01:28:00.967] GMLO gmlo_debug: string 'gmlo debug message ' -> runtime index 15096, push.s reads 'gmlo debug message ' (match)
+[01:28:00.967] GMLO gmlo_debug: string 'gmlo debug message ' -> runtime index 15096, push.s reads 'gmlo debug message ' (match)
+[01:28:01.946] GMLO gmlo_builtin round 1: PASS global_eq_builtin gmlo_room_speed room_speed -> got '60', want '60'
+[01:28:01.946] GMLO gmlo_builtin round 1: 100 runs total, result '60', private bytes +0 KB over 100 runs
+[01:28:01.946] GMLO gmlo_debug round 1: PASS result 6 -> got '6', want '6'
+[01:28:01.946] GMLO gmlo_debug round 1: PASS global gmlo_last_message gmlo debug message 6 -> got 'gmlo debug message 6', want 'gmlo debug message 6'
+[01:28:01.946] GMLO gmlo_debug round 1: PASS debug_message gmlo debug message 6 -> got '100 x 'gmlo debug message 6'', want '100 x 'gmlo debug message 6''
+[01:28:01.946] GMLO gmlo_debug round 1: 100 runs total, result '6', private bytes +0 KB over 100 runs
+[01:28:01.946] GMLO gmlo_globals round 1: PASS result 12 -> got '12', want '12'
+[01:28:01.946] GMLO gmlo_globals round 1: PASS global gmlo_counter 6 -> got '6', want '6'
+[01:28:01.946] GMLO gmlo_globals round 1: 100 runs total, result '12', private bytes +0 KB over 100 runs
+[01:28:01.946] GMLO gmlo_script round 1: PASS global_eq_script gmlo_script_result gml_Script___spelunker_minutes_to_seconds 2 -> got '120', want '120'
+[01:28:01.946] GMLO gmlo_script round 1: PASS global_eq_script gmlo_script_total gml_Script___spelunker_minutes_to_seconds 6 -> got '360', want '360'
+[01:28:01.947] GMLO gmlo_script round 1: 100 runs total, result '121', private bytes +0 KB over 100 runs
+[01:28:02.966] GMLO gmlo_builtin round 2: PASS global_eq_builtin gmlo_room_speed room_speed -> got '60', want '60'
+[01:28:02.966] GMLO gmlo_builtin round 2: 200 runs total, result '60', private bytes +0 KB over 100 runs
+[01:28:02.966] GMLO gmlo_debug round 2: PASS result 6 -> got '6', want '6'
+[01:28:02.966] GMLO gmlo_debug round 2: PASS global gmlo_last_message gmlo debug message 6 -> got 'gmlo debug message 6', want 'gmlo debug message 6'
+[01:28:02.966] GMLO gmlo_debug round 2: PASS debug_message gmlo debug message 6 -> got '200 x 'gmlo debug message 6'', want '200 x 'gmlo debug message 6''
+[01:28:02.966] GMLO gmlo_debug round 2: 200 runs total, result '6', private bytes +0 KB over 100 runs
+[01:28:02.967] GMLO gmlo_globals round 2: PASS result 12 -> got '12', want '12'
+[01:28:02.967] GMLO gmlo_globals round 2: PASS global gmlo_counter 6 -> got '6', want '6'
+[01:28:02.967] GMLO gmlo_globals round 2: 200 runs total, result '12', private bytes +0 KB over 100 runs
+[01:28:02.967] GMLO gmlo_script round 2: PASS global_eq_script gmlo_script_result gml_Script___spelunker_minutes_to_seconds 2 -> got '120', want '120'
+[01:28:02.967] GMLO gmlo_script round 2: PASS global_eq_script gmlo_script_total gml_Script___spelunker_minutes_to_seconds 6 -> got '360', want '360'
+[01:28:02.981] GMLO gmlo_script round 2: 200 runs total, result '121', private bytes +0 KB over 100 runs
+[01:28:03.993] GMLO gmlo_builtin round 3: PASS global_eq_builtin gmlo_room_speed room_speed -> got '60', want '60'
+[01:28:03.993] GMLO gmlo_builtin round 3: 300 runs total, result '60', private bytes +0 KB over 100 runs
+[01:28:03.994] GMLO gmlo_debug round 3: PASS result 6 -> got '6', want '6'
+[01:28:03.994] GMLO gmlo_debug round 3: PASS global gmlo_last_message gmlo debug message 6 -> got 'gmlo debug message 6', want 'gmlo debug message 6'
+[01:28:03.994] GMLO gmlo_debug round 3: PASS debug_message gmlo debug message 6 -> got '300 x 'gmlo debug message 6'', want '300 x 'gmlo debug message 6''
+[01:28:03.994] GMLO gmlo_debug round 3: 300 runs total, result '6', private bytes +0 KB over 100 runs
+[01:28:03.994] GMLO gmlo_globals round 3: PASS result 12 -> got '12', want '12'
+[01:28:03.994] GMLO gmlo_globals round 3: PASS global gmlo_counter 6 -> got '6', want '6'
+[01:28:03.994] GMLO gmlo_globals round 3: 300 runs total, result '12', private bytes +0 KB over 100 runs
+[01:28:03.994] GMLO gmlo_script round 3: PASS global_eq_script gmlo_script_result gml_Script___spelunker_minutes_to_seconds 2 -> got '120', want '120'
+[01:28:03.994] GMLO gmlo_script round 3: PASS global_eq_script gmlo_script_total gml_Script___spelunker_minutes_to_seconds 6 -> got '360', want '360'
+[01:28:03.994] GMLO gmlo_script round 3: 300 runs total, result '121', private bytes +0 KB over 100 runs
+[01:28:03.994] GMLO summary: 4 of 4 snippets passed all 3 rounds
+[01:28:05.009] getPriestCount() via raw call.i (expected to fault): Code_Execute faulted, exception 0xC0000005
+[01:28:05.009] YYCVmProbe done

@@ -1,0 +1,4 @@
+repeat 100
+result 6
+global gmlo_last_message gmlo debug message 6
+debug_message gmlo debug message 6

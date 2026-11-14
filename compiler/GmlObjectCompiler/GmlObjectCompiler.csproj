@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compiles GML snippets with Underanalyzer (through UndertaleModLib) into position-independent
+    "linkable objects" (.gmlo): bytecode with unresolved operand words plus a relocation table
+    (variables, functions, strings). A runtime linker resolves the names against the running
+    runner (modloader/yyc_vm_probe on YYC). Works against VM and YYC data.win files: for YYC the
+    missing CODE/VARI/FUNC chunks are created empty. See compiler/RUNTIME_COMPILER.md.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <RollForward>Major</RollForward>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../external/UndertaleModTool/UndertaleModLib/UndertaleModLib.csproj" />
+  </ItemGroup>
+</Project>

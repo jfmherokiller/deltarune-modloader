@@ -13,6 +13,7 @@ the loader used before).
 | `tools/runtime_bytecode_fixtures.py` | Pairs a spike named capture with the served data.win: offline/runtime `.bin` files and side-by-side listings. |
 | `fixtures/runtime_bytecode/` | Live-captured runtime vs. pre-fixup bytecode for seven GML snippets (ROADMAP 41). |
 | `tools/bytecode_fixup.py` | The runner's load-time operand fixup (variable/function ids), see RUNTIME_COMPILER.md. |
+| `GmlObjectCompiler/` | GML snippet -> linkable object (`.gmlo`): Underanalyzer bytecode with open reference operands plus relocations. Works against VM and YYC data.win files. Runtime linker for YYC: `modloader/include/gmlo_link.hpp` (RUNTIME_COMPILER.md "YYC: running linked bytecode"). |
 | `tests/` | `python3 -m unittest discover -s compiler/tests`: fixup vs. the runtime fixtures, byte for byte. |
 
 ## Build / install

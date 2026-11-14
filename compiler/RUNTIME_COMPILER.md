@@ -232,6 +232,126 @@ For live injection, back `Resolver` with the runner's own tables: built-in varia
 routines by name, user variables via the runner's variable-name table, and scripts via SCPT or
 the runner's script list. Do not use data.win.
 
+## YYC: running linked bytecode (ROADMAP 4, YYC half)
+
+Verified 2026-11-14 on Dwarf Eats Mountain 1.1.0 (YYC, runner 2024.14.4.268, Wine 11): four GML
+snippets were compiled with Underanalyzer, linked against the live game and run on the YYC
+runner's embedded VM, 3 rounds × 100 runs on separate frames. Every side-effect check passed in
+every round, with no fault and +0 KB private bytes per 100 runs. Log:
+`modloader/yyc_vm_probe/gmlo/dwarf_eats_mountain.log`.
+
+| Snippet (`modloader/yyc_vm_probe/gmlo/`) | Covers | Verified through YYTK, outside the bytecode |
+|---|---|---|
+| `gmlo_globals` | global set, `+=`, read-back | result `12`, `global.gmlo_counter` = `6` |
+| `gmlo_debug` | `show_debug_message` with a new string, a `for` loop, locals, `string()` | result `6`; the hooked built-in saw `"gmlo debug message 6"` once per run (300 of 300); `global.gmlo_last_message` matches |
+| `gmlo_script` | calls to a compiled script, inside a loop | `global.gmlo_script_result` = `gml_Script___spelunker_minutes_to_seconds(2)` called natively (`120`); the loop total = the script at 6 (`360`) |
+| `gmlo_builtin` | built-in variable read (`pushbltn room_speed`) | `global.gmlo_room_speed` = YYTK `GetBuiltin("room_speed")` (`60`) |
+
+### Pipeline
+
+1. **Compile** (offline): `compiler/GmlObjectCompiler <game data.win> <out> <snippet.gml>...`
+   writes a `.gmlo`: Underanalyzer's bytecode with every reference operand left open, plus the
+   relocations `(offset, var|func|string, name)`. A YYC data.win has no `CODE`/`VARI`/`FUNC`
+   chunks; `PrepareContext` adds empty ones and declares every `gml_Script_X` in `SCPT` as the
+   global function `X`, so calls compile to `call.i gml_Script_X`. The prepared function table
+   must be passed to `CodeImportGroup` (`new GlobalDecompileContext(data, data.GlobalFunctions)`):
+   a fresh context rebuilds it from `CODE`, drops the declarations, and script calls then compile
+   as `callv` on an instance variable.
+2. **Link** (in the game, on the game thread): `modloader/include/gmlo_link.hpp`, `gmlo::Linker`.
+   Every id comes from the runner, none from data.win:
+
+   | Operand | Resolved with | Dwarf values |
+   |---|---|---|
+   | built-in variable | YYTK `GetBuiltinVariableIndex` (not tried for locals, instance type -7) | `room_speed` = 139. DELTARUNE's VM fixtures have 136, so built-in indices change between runner versions |
+   | any other variable (global, self, local) | YYTK `GetVariableSlot`, the runner's find-or-allocate on its one name table | existing names keep their id (`n` 107572); new names get the next free ids in link order (111131, 111132, ...). This settles the open item in Rule V for YYC |
+   | function | YYTK `GetNamedRoutineIndex` | `string` 266, `show_debug_message` 1280, `script_execute` 804, `gml_Script___spelunker_minutes_to_seconds` 104448 (100000 + index) |
+   | string | `gmlo::RunnerStrings::Intern` (below) | existing strings keep their data.win index; `"gmlo debug message "` was appended as 15096 |
+
+3. **Run**: the linked words go into a hand-built `VMBuffer` + `CCode` and through YYTK
+   `ExecuteCodeObject` (the runner's own `Code_Execute`, from the repo's YYToolkit fork).
+
+### Layout: the same on both runners
+
+`Code_Execute` (`0x140ECE8C0`), `VM::Exec` (`0x140EF1C30`) and `VMBuffer::Prepare` (`0x140F75760`)
+in the Dwarf exe read the same `CCode` and `VMBuffer` fields that RE/10 documents for DELTARUNE's
+VM runner:
+
+| Field | Offset | Set by the linker |
+|---|---|---|
+| `CCode` size | `0xB8` | allocated zeroed |
+| kind | `+0x10` | 1 |
+| `VMBuffer*` | `+0x68` | the linked buffer |
+| name | `+0x80` | the object's name |
+| script index | `+0x88` | -1 |
+| compiled function | `+0x90` | **null.** This is the only YYC-specific field. On YYC, `Code_Execute` calls it when it is set and falls through to `VM::Exec` when it is null. On VM, RE/10 has a metadata pointer here |
+| local count | `+0xA0` | `.gmlo` `locals` (`VM::Exec` makes a locals object when > 0) |
+| argument count | `+0xA4` | `.gmlo` `args` |
+| `VMBuffer` size | `0x30` | allocated zeroed (no vtable needed: it is never destroyed) |
+| bytecode length / pointer | `+0x08` / `+0x18` | the linked words |
+| threaded code / jump table | `+0x20` / `+0x28` | filled by `VMBuffer::Prepare` on the first run |
+
+**Never free or reuse a bytecode buffer.** `VMBuffer::Prepare` caches the threaded form in a hash
+keyed by `(bytecode address + 1) & 0x7FFFFFFF`. A new buffer at a freed buffer's address would run
+the old code. Link once, then run the same `CCode` as often as needed. The linker leaks the few
+hundred bytes per linked object on purpose.
+
+### Fixup differences on YYC
+
+- **Script calls are lowered.** `VMBuffer::Prepare` selects the `call.i` handler by id: below
+  100000 is the built-in handler; 100000–500000 is the script handler (except 499999). The
+  script handler runs the script's `CCode` as bytecode. YYC scripts have none, so it faults (the
+  probe's raw `call.i` gets `0xC0000005`). On YYC the linker therefore rewrites each `call.i` to
+  a script:
+  ```
+  call.i gml_Script_X(argc=n)   ->   push.i <id of gml_Script_X>; conv.i.v; call.i script_execute(argc=n+1)
+  ```
+  The pushed id lands on top of the stack, so it becomes `script_execute`'s first argument.
+  Inserting 3 words moves the code after the call. The linker fixes every branch (`b`/`bt`/`bf`/
+  `pushenv`/`popenv`, a 23-bit signed offset in words; the `popenv` exit magic `0xF00000` is left
+  alone) and every later relocation. A branch to the call lands on the inserted `push.i`. In
+  `gmlo_script` the loop's `bf +17` became `bf +20` and its `b -20` became `b -23`.
+- **Strings work as on VM.** YYC keeps `STRG`, and the VM's `push.s` handler (the `Push` handler
+  `0x140EE45E0`, type 6) reads `chars = image + table[i] + 4`. `image` is the loaded data.win
+  (the FORM header). `table` is a `uint32_t[]` of STRG entry offsets; on Dwarf it starts as
+  STRG's own offset array inside the image. `RunnerStrings` finds both pointers by value: it
+  scans the exe's writable data sections for a pointer to a FORM image whose `STRG` parses, and
+  for a pointer to the first eight STRG offsets. The slot on Dwarf is `0x141B6F780` (RVA
+  `0x1B6F780`). A string the game already has keeps its index. A new string is appended: its
+  text goes into memory within 4 GB above the image (the table holds 32-bit offsets), and the
+  table pointer is swapped to a grown copy. Each appended string is read back through the VM's
+  own `push.s` (`ReadRunnerString`), and every one matched. Whether DELTARUNE's VM runner reads
+  strings the same way is not checked yet; if it does, the same code covers new strings on VM.
+- Variable and built-in-call operands are the same as on VM: `(ref bits) | id`, and the whole id.
+
+### Reproduce (Linux, Wine)
+
+```sh
+modloader/yyc_vm_probe/build.sh                       # YYCVmProbe.dll
+tools/build_yytoolkit.sh                              # fork YYToolkit.dll with ExecuteCodeObject (out/yytk)
+modloader/build.sh                                    # current loader: older ones crash under Wine 11
+modloader/yyc_vm_probe/gmlo/compile.sh "<game>/data.win" "<game>/gmlo"
+# back up <game>/version.dll and <game>/mods, then install: build/version.dll as version.dll,
+# out/yytk/YYToolkit.dll and YYCVmProbe.dll in mods/aurie (other plugins disabled)
+cd "<game>" && WINEPREFIX=<prefix> WINEDLLOVERRIDES="version=n,b" WINEDEBUG=-all wine "Dwarf Eats Mountain.exe"
+# wait for "YYCVmProbe done" in <game>/yyc_vm_probe.log, then: WINEPREFIX=<prefix> wineserver -k
+```
+
+Keep `.gmlo` files out of `mods/`, since the DELTARUNE loader treats every folder there as a loose
+mod. Under the loader the runner's stdout is not captured, so the probe hooks `show_debug_message`
+to count the messages.
+
+### Limitations (YYC)
+
+- `GmlObjectCompiler` rejects code that creates child entries (`function` declarations inside a
+  snippet).
+- Only `call.i` is lowered. A script used as a value (`push.i` of a function id, e.g.
+  `method(undefined, X)` or `callv` on it) is linked unchanged. It probably reaches the same
+  faulting script path when called; this is untested.
+- The snippets run with the global instance as `self`. Instance variables on a real instance are
+  untested on YYC.
+- `RunnerStrings` assumes the runner keeps the image pointer and the table pointer in the exe's
+  own data section. If either is missing, the linker refuses string relocations.
+
 ## Generalizing
 
 Nothing in `ClrHost`, `RuntimeExports`, or the dump code is DELTARUNE-specific. The DELTARUNE

@@ -183,9 +183,9 @@ data.win references to runtime ids, including the runtime string table.
 
 ## Next steps
 
-1. Link compiled GML at run time: Underanalyzer output → operands rewritten to runtime
-   ids (built-ins, variables, strings, `script_execute` for compiled scripts) → wrapped in
-   a `CCode`/`VMBuffer` as `YYCVmProbe` does. Shared with the VM-game runtime compiler.
+1. ~~Link compiled GML at run time~~ (done 2026-11-14): `modloader/include/gmlo_link.hpp`
+   links `compiler/GmlObjectCompiler` output against the live runner and `YYCVmProbe` runs it;
+   see `compiler/RUNTIME_COMPILER.md`, "YYC: running linked bytecode".
 2. Generic `Code_Execute` lookup for mods: YYTK should expose its trampoline or a public
    "execute CCode" call, instead of plugins looking up YYTK's hook by name.
 3. Name the remaining YYC-internal helpers (copy, variable get/set, legacy call) by call
