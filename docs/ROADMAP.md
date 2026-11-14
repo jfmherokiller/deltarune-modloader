@@ -290,11 +290,23 @@ locations and code-entry evidence for each one.
     one plugin (RunnerCompiler). Publish one `gmlrt::Runtime` per process as an Aurie interface
     (like `GmScriptHooks`), so mods and the editor (task 16) share the CLR, the cache and the
     string table instead of each hosting their own.
-47. **[feature] S: DialogueBacklog transcript is hard to find.** It is written to the game's save
-    folder (`%LOCALAPPDATA%\DELTARUNE\dialogue_log_chN.txt`), which under Proton is deep inside the
-    Wine prefix. The owner tested everything else and only this was a problem (2026-11-14). Options:
-    show the full path in the backlog's footer, write a copy next to the mod in `mods\DialogueBacklog\`
-    (GameMaker's file sandbox may need LooseMods' help to write outside the save folder), or both.
+47. **[feature] M: per-mod config and data folders, BepInEx-style.** The DialogueBacklog transcript
+    is written to the game's save folder, which under Proton is deep inside the Wine prefix; the owner
+    found that the one real problem (2026-11-14). Generalise it so any mod gets local storage:
+    - Layout, like BepInEx's central `BepInEx/config/` (so updating or deleting a mod's folder never
+      wipes user settings): `mods/config/<ModId>.ini` for settings and `mods/data/<ModId>/` for
+      everything else a mod saves (`logs/`, transcripts, caches). The loader creates them on demand.
+    - Native GML functions registered by the loader, so GML mods can use them on VM and YYC games,
+      e.g. `modloader_config_path(mod_id)` and `modloader_data_dir(mod_id)`, plus write helpers if
+      GameMaker's file sandbox blocks paths outside the save folder. Built-ins are added with the
+      runner's `Function_Add` (RE/04_builtin_functions.md); the runtime-GML linker already resolves
+      built-ins by name, so code compiled at run time can call them too.
+    - ModHost's native plugins get the same paths (`GetPluginInfo().configPath` moves to
+      `mods/config/<id>.ini`; add a data dir), so GML mods and native plugins share one convention.
+    - First user: DialogueBacklog (transcripts to `mods/data/DialogueBacklog/logs/`, settings to
+      `mods/config/DialogueBacklog.ini`, migrating the old files from the save folder once).
+    Cards: research t_36d7f648 -> implementation t_bd9dfca1 -> DialogueBacklog port t_33d3cfc6
+    (all parked; start manually).
 48. **[idea] M (optional, later): DialogueBacklog character portraits** next to speaker names.
 
 ## What goes upstream (proposed policy)
