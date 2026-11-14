@@ -33,6 +33,14 @@ Script redirects use the shared `GmScriptHooks` interface (`yyc_interop/include/
 | `CCode` list head, used to find redirect substitutes by name | Off. Fixed RVA |
 | Everything else | Works in any GameMaker game |
 
+## Loose-GML compile cache
+
+`source/GmlCache.hpp` keeps each chapter's compiled `data.win` in `mods\cache\loosegml\<chapter>\`
+with a plain-text `manifest.txt` key (mod file hashes, mod order, vanilla `data.win`, compiler,
+this DLL). An unchanged key skips the compiler; a miss logs the first key line that changed and
+rewrites the cache from a background thread. `gml_cache=0` / `DR_GML_CACHE=0` bypasses it. The
+XXH64 used for the key and the integrity check is `modloader/include/xxh64.hpp`.
+
 ## Logging
 
 Logging uses Win32 file handles (`modloader/include/append_log.hpp`), not `fopen`.

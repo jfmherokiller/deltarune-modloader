@@ -9,7 +9,7 @@
 //   2. Loose GML / sprites / sounds: when the game reads a data.win and an enabled mod has
 //      code\*.gml|*.patch|*.diff, sprites\*.png or sounds\*.ogg|*.wav for it, LooseModCompiler
 //      (or UTMT's CLI) patches a copy in memory and the game gets the result. data.win on disk
-//      is never modified.
+//      is never modified. The result is cached in mods\cache\loosegml (GmlCache.hpp).
 //   3. Redirects (mods\<ModName>\redirects.txt, "target = substitute"):
 //      - object events (gml_Object_*) through YYToolkit's EVENT_OBJECT_CALL;
 //      - scripts (gml_Script_*) through script_hooks.hpp (gm::Redirect), which also sees
@@ -27,6 +27,7 @@
 #include <YYToolkit/YYTK_Shared.hpp>
 #include <script_hooks.hpp>
 #include <append_log.hpp>
+#include "GmlCache.hpp"
 #include <windows.h>
 #include <cstdio>
 #include <cstdlib>
@@ -186,8 +187,9 @@ namespace
 			if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) continue;
 			if (fd.cFileName[0] == L'.' || fd.cFileName[0] == L'_') continue;
 			if (!_wcsicmp(fd.cFileName, L"native") || !_wcsicmp(fd.cFileName, L"aurie") ||
-				!_wcsicmp(fd.cFileName, L"plugins") || !_wcsicmp(fd.cFileName, L"tools"))
-				continue;   // Aurie and ModHost folders, compiler
+				!_wcsicmp(fd.cFileName, L"plugins") || !_wcsicmp(fd.cFileName, L"tools") ||
+				!_wcsicmp(fd.cFileName, L"cache"))
+				continue;   // Aurie and ModHost folders, compiler, loose-GML cache
 			if (g_ModCount >= MAX_MODS) break;
 			wcsncpy(g_ModNames[g_ModCount++], fd.cFileName, MAX_PATH - 1);
 		} while (FindNextFileW(h, &fd));
@@ -237,6 +239,22 @@ namespace
 	PFN_GmAlloc g_GmAlloc = nullptr;
 	WCHAR g_UtmtCli[MAX_PATH * 2], g_ImportScript[MAX_PATH * 2];
 	DWORD g_GmlTimeoutMs = 300000;
+	int g_GmlCache = 1;            // [loader] gml_cache, overridden by env DR_GML_CACHE
+	std::wstring g_ModulePath;     // LooseMods.dll, part of the cache key
+
+	void* GmAllocBytes(size_t n) { return g_GmAlloc(n, 0, 0, 0); }
+
+	std::vector<std::wstring> SplitDirs(const WCHAR* dirs)
+	{
+		std::vector<std::wstring> out;
+		for (const WCHAR* p = dirs; *p;) {
+			const WCHAR* e = wcschr(p, L';');
+			size_t n = e ? (size_t)(e - p) : wcslen(p);
+			if (n) out.emplace_back(p, n);
+			p += n + (e ? 1 : 0);
+		}
+		return out;
+	}
 
 	struct PipeRx { HANDLE pipe; unsigned char* buf; unsigned long long len, got; int ok; };
 	DWORD WINAPI PipeReader(LPVOID p)
@@ -327,6 +345,26 @@ namespace
 			Log("loose GML: %d mod folder(s) for this data.win but compiler missing (%s) - running vanilla", mods, c);
 			return nullptr;
 		}
+		// Compile cache (GmlCache.hpp): an unchanged set of inputs gets the stored result.
+		gmlcache::Inputs ci;
+		std::string key;
+		char rel_u[MAX_PATH * 6];
+		W2U(rel_dir, rel_u, sizeof rel_u);
+		if (g_GmlCache) {
+			DWORD tc = GetTickCount();
+			ci = { g_GameRoot, g_ModsDir, g_ModulePath, g_UtmtCli, g_ImportScript, full, rel_dir, SplitDirs(dirs) };
+			std::string manifest, reason;
+			gmlcache::ReadSmallFile(gmlcache::CacheDir(ci) + L"\\manifest.txt", manifest);
+			key = gmlcache::BuildKey(ci, manifest);
+			if (void* hit = gmlcache::Load(ci, key, manifest, GmAllocBytes, out_size, reason)) {
+				Log("loose GML: cache HIT for %s (%d mod folder(s)): %u bytes served from mods\\cache in %lu ms, compiler skipped",
+					rel_u, mods, out_size ? *out_size : 0, GetTickCount() - tc);
+				return hit;
+			}
+			Log("loose GML: cache MISS for %s (%s; checked in %lu ms)", rel_u, reason.c_str(), GetTickCount() - tc);
+		} else {
+			Log("loose GML: cache off (gml_cache=0 or DR_GML_CACHE=0)");
+		}
 		{
 			char c[MAX_PATH * 6];
 			const WCHAR* name = wcsrchr(g_UtmtCli, L'\\');
@@ -384,6 +422,8 @@ namespace
 			return nullptr;   // rx.buf came from the runner's allocator; leaking it once on failure is harmless
 		}
 		Log("loose GML: compiled OK in %lu ms, %llu bytes served from memory", GetTickCount() - t0, rx.len);
+		if (g_GmlCache && !gmlcache::StoreAsync(ci, key, rx.buf, rx.len, Log))
+			Log("loose GML: cache write FAILED for %s (%lu); the next launch compiles again", rel_u, GetLastError());
 		if (out_size) *out_size = (unsigned int)rx.len;
 		return rx.buf;
 	}
@@ -516,7 +556,6 @@ namespace
 // Runs while the main thread is parked at the entry point: nothing has read data.win yet.
 EXPORTED AurieStatus ModulePreinitialize(IN AurieModule* Module, IN const fs::path& ModulePath)
 {
-	UNREFERENCED_PARAMETER(ModulePath);
 	g_Module = Module;
 	GetModuleFileNameW(nullptr, g_GameRoot, MAX_PATH);
 	WCHAR* slash = wcsrchr(g_GameRoot, L'\\'); if (slash) *slash = 0;
@@ -530,6 +569,10 @@ EXPORTED AurieStatus ModulePreinitialize(IN AurieModule* Module, IN const fs::pa
 	g_LogFiles = GetPrivateProfileIntW(L"loader", L"log_files", 1, g_Ini);
 	g_LogScripts = GetPrivateProfileIntW(L"loader", L"log_scripts", 0, g_Ini);
 	g_GmlTimeoutMs = GetPrivateProfileIntW(L"loader", L"gml_timeout_ms", 300000, g_Ini);
+	g_GmlCache = GetPrivateProfileIntW(L"loader", L"gml_cache", 1, g_Ini);
+	WCHAR env[16];
+	if (GetEnvironmentVariableW(L"DR_GML_CACHE", env, 16) && env[0]) g_GmlCache = _wtoi(env);
+	g_ModulePath = ModulePath.wstring();
 
 	// Loose GML compiler: utmt_cli in modloader.ini, else mods\tools\compiler\LooseModCompiler.exe
 	// (ImportLooseMod compiled in; same command line and pipe protocol), else UTMT's CLI with the

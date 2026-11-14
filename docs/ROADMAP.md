@@ -255,8 +255,9 @@ locations and code-entry evidence for each one.
     including the freeze during the bullet phase.
 34. ~~**[test] S: DialogueBacklog in-game test**~~ Done: confirmed in-game by the owner (2026-11-14):
     open, scroll and close in overworld and battle.
-35. **[feature] S: cache the loose-GML compile.** Key it on the vanilla `data.win` hash plus the mod
-    files' mtimes. Chapter 5 with three mods takes about 4 s on every chapter launch today.
+35. ~~**[feature] S: cache the loose-GML compile.**~~ Done (2026-11-14): `mods\cache\loosegml\`,
+    keyed on mod file contents, mod order, vanilla `data.win`, compiler and LooseMods build
+    (`modloader/loosemods/source/GmlCache.hpp`). Ch5 with three mods: 2.8–4.9 s compile → ~0.1 s.
 36. **[feature] M: streamed `.ogg` overrides.** Music beside `data.win` and in `mus\` is opened by
     the audio engine, not `ReadEntireFile`.
 37. **[feature] S: sprite size-change behaviour.** Decide the resize/origin rules for frames whose

@@ -42,6 +42,7 @@ DELTARUNE\
     load_order.txt         optional explicit load order (see below)
     modloader.log          written by the proxy and LooseMods ([loosemods] lines)
     native\ aurie\ plugins\ tools\   framework folders, not mods
+    cache\                 loose-GML compile cache (safe to delete)
     MyMod\
       chapter1_windows\lang\lang_en.json    ← replaces the game's file
       chapter2_windows\options.ini
@@ -83,6 +84,7 @@ log_files=0                       ; LooseMods: 1 = log every file read (research
 log_scripts=0                     ; LooseMods: 1 = log each object event / global script the first time it runs
 ;utmt_cli=                        ; LooseMods: loose GML compiler override
 gml_timeout_ms=300000             ; LooseMods: compiler timeout
+gml_cache=1                       ; LooseMods: 0 = always recompile loose GML (env DR_GML_CACHE overrides)
 ```
 
 ## Loose GML, sprites and sounds (no xdelta, no rebuilt data.win)
@@ -162,8 +164,20 @@ When the game reads a `data.win` that any enabled mod has loose assets for, the 
 runs UTMT's own library (`mods\tools\ImportLooseMod.csx`) on the vanilla file, applying
 all mods in load order (a later mod wins on the same name). Sprites and sounds are imported
 before code, so GML can reference new asset names. The patched data goes to the game
-from memory. The `data.win` on disk is never modified and no patched copy is written. On
-any error the game runs vanilla, and the details go to `mods\modloader.gml.log`.
+from memory. The `data.win` on disk is never modified. On any error the game runs vanilla,
+and the details go to `mods\modloader.gml.log`.
+
+**Compile cache.** The compiler's output is kept in `mods\cache\loosegml\<chapter>\` (`data.win`
+plus `manifest.txt`) and served again on the next launch as long as nothing it depends on
+changed: the content of every file under the mods' `code\`, `sprites\` and `sounds\`, which mod
+folders take part and in what order, the vanilla `data.win` (size, mtime and content hash), the
+compiler install and `LooseMods.dll`. Chapter 5 with CheatMenu, DialogueBacklog and
+SpriteInspector: about 3–5 s of compiling becomes about 0.1 s. `modloader.log` says `cache HIT`, or
+`cache MISS` with the first input that changed. A miss compiles as before and writes the cache in
+the background (temp file + rename; the artifact's hash is checked on every hit, so a damaged
+cache only costs one recompile). `gml_cache=0` in `modloader.ini`, or `DR_GML_CACHE=0` in the
+environment, bypasses it; delete `mods\cache\` to clear it. Each chapter's entry is about the
+size of its `data.win`.
 
 - Sprite PNGs are packed onto new texture pages. A replaced frame 0 with a different size
   resizes the sprite. Precise collision masks are regenerated only for sprites that
