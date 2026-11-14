@@ -105,8 +105,9 @@ Overview and evidence: `../docs/yyc_il2cpp.md`. Test game: Dwarf Eats Mountain 1
   0 failures); patched `obj_writer_Draw_0` / `obj_choicer_neo_Other_10` / `obj_time_Step_1` checked
   by decompiling the output. Installed in the game's `mods/`.
 - [x] Ch5 live run (v1): transcript written with correct speakers (Susie, Asgore, Flowery); long pages were logged twice (writer re-wrap inserts `||`), fixed in the page key + add() dedupe.
-- [ ] In-game test of the fixed build: open/scroll/close T in overworld and battle,
-  speaker names, choice entry, transcript file location under Proton, reload after relaunch.
+- [x] In-game test of the fixed build: open/scroll/close T in overworld and battle (confirmed by the owner 2026-11-14).
+- [ ] Still untested in-game: speaker names, choice entry, transcript file location under Proton,
+  reload after relaunch.
 
 Durable notes so work can be picked up later. Two parallel tracks:
 
@@ -969,7 +970,7 @@ dynamic approach runs `DELTARUNE.exe` through `wine`/Proton.
             verified (file select title, C-menu → wrench → Mod Configuration) with CheatMenu stacked.
             Diff applier: hunks placed nearest their line hint; `gml_Script_` call prefixes that the
             decompiler emits after a full replacement are normalized before matching.
-      - [ ] CheatMenu: test inside a battle (freeze via instance_deactivate_all during bullet phase).
+      - [x] CheatMenu: test inside a battle (freeze via instance_deactivate_all during bullet phase).
       - [ ] Per-script runtime swap (follow-up, per user): compile a single .gml and
             replace that `CCode`'s `VMBuffer` live, with no full-file recompile. First
             needs runtime registration of new variable/string ids (IDA).

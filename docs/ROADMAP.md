@@ -251,9 +251,10 @@ locations and code-entry evidence for each one.
       release builds; find out what the remaining branches do.
     - Check whether `global.encounterno` gives a usable encounter toggle.
     - Room warp (`room_goto`) is risky for story state; decide whether it is worth offering.
-33. **[test] S: CheatMenu inside a battle** (freeze during the bullet phase), from `RE/TODO.md`.
-34. **[test] S: DialogueBacklog in-game test** (open, scroll and close in overworld and battle;
-    `RE/TODO.md`).
+33. ~~**[test] S: CheatMenu inside a battle**~~ Done: confirmed in-game by the owner (2026-11-14),
+    including the freeze during the bullet phase.
+34. ~~**[test] S: DialogueBacklog in-game test**~~ Done: confirmed in-game by the owner (2026-11-14):
+    open, scroll and close in overworld and battle.
 35. **[feature] S: cache the loose-GML compile.** Key it on the vanilla `data.win` hash plus the mod
     files' mtimes. Chapter 5 with three mods takes about 4 s on every chapter launch today.
 36. **[feature] M: streamed `.ogg` overrides.** Music beside `data.win` and in `mus\` is opened by
