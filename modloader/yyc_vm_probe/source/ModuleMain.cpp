@@ -323,6 +323,11 @@ static void HookShowDebugMessage()
 static void LinkSnippets()
 {
 	HookShowDebugMessage();
+	if (!gmlo::HasExecuteCodeObject(g_Yytk))
+	{
+		Log("GMLO: this YYToolkit.dll has no ExecuteCodeObject (needs the fork, external/YYToolkit 85ce5b9+)");
+		return;
+	}
 	g_Linker = new gmlo::Linker(g_Yytk);
 	auto& strings = g_Linker->Strings();
 	if (strings.Discover())

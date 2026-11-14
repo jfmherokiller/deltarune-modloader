@@ -1,0 +1,2 @@
+# control for the memory measurement
+rcl_noop.gmlo  1000  result 0

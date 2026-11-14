@@ -1,0 +1,42 @@
+link plan: 5 object(s)
+link: VM runner, data.win image 0000000003080060, string table slot 00000001406A9E20 (exe+0x6a9e20), 1144 strings
+link: show_debug_message hooked for "debug" checks
+link: resolver self-test (launcher fixture ids): room_speed=136 x=0 i=100049 method=162 abs=200 @@NewGMLArray@@=2253 gml_Script_strlen=100081
+link: rcl_globals.gmlo -> gml_GlobalScript_rcl_globals, 80 bytes, 6 relocations, 1 new strings, CCode 000000000307DF60
+link: rcl_debug.gmlo -> gml_GlobalScript_rcl_debug, 164 bytes, 11 relocations, 2 new strings, CCode 000000000307EAC0
+link: rcl_script.gmlo -> gml_GlobalScript_rcl_script, 60 bytes, 5 relocations, 1 new strings, CCode 000000000307EC80
+link: rcl_instance.gmlo -> gml_GlobalScript_rcl_instance, 128 bytes, 11 relocations, 0 new strings, CCode 000000000307ED60
+link: rcl_strings.gmlo -> gml_GlobalScript_rcl_strings, 112 bytes, 9 relocations, 3 new strings, CCode 000000000307EE40
+link: 1144 runner strings, 7 appended; private bytes 134078464
+run: rcl_globals.gmlo #1 -> number 1
+run: rcl_debug.gmlo #1 -> number 1
+run: rcl_script.gmlo #1 -> number 107
+run: rcl_instance.gmlo #1 -> number 0
+run: rcl_strings.gmlo #1 -> string rcl new string:2
+mem: run 10, private bytes 134160384
+mem: run 100, private bytes 134402048
+mem: run 200, private bytes 134422528
+mem: run 300, private bytes 134434816
+mem: run 400, private bytes 135122944
+mem: run 500, private bytes 135139328
+mem: run 600, private bytes 135151616
+mem: run 700, private bytes 135159808
+mem: run 800, private bytes 135172096
+mem: run 900, private bytes 135172096
+run: rcl_globals.gmlo #1000 -> number 1000
+  check PASS: result == 1000 (got 1000)
+  check PASS: global rcl_counter == 1000 (got 1000)
+run: rcl_debug.gmlo #1000 -> number 1000
+  check PASS: result == 1000 (got 1000)
+  check PASS: global rcl_debug_runs == 1000 (got 1000)
+  check PASS: debug == [rcl] linked bytecode says hello, run 1 (got [rcl] linked bytecode says hello, run 1)
+  check PASS: debug == [rcl] linked bytecode says hello, run 100 (got [rcl] linked bytecode says hello, run 100)
+run: rcl_script.gmlo #1000 -> number 107
+  check PASS: result == 107 (got 107)
+  check PASS: global rcl_strlen == 107 (got 107)
+run: rcl_instance.gmlo #1000 -> number 614
+  check PASS: self rcl_sum == 45 (got 45)
+run: rcl_strings.gmlo #1000 -> string rcl new string:2
+  check PASS: result == rcl new string:2 (got rcl new string:2)
+mem: run 1000, private bytes 135180288
+link: done, 5/5 objects linked, 5 CCode objects, 7 appended strings, private bytes 134160384 at run 10 -> 135180288 (1019904), 0 failure(s)

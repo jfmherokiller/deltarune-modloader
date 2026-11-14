@@ -1,0 +1,12 @@
+GMLO 1
+name gml_GlobalScript_rcl_script
+locals 1
+args 0
+local arguments
+code c0060000 00000483 07560000 d9020001 00000000 840fff9c 07520000 d9020001 00000000 0c550000 4555fffb a0000000 c205fffb a0000000 9c050000
+reloc 0 string linked!
+reloc 12 func gml_Script_strlen
+reloc 28 func abs
+reloc 40 var -5 rcl_strlen
+reloc 48 var -5 rcl_strlen
+end

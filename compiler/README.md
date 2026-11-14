@@ -8,13 +8,15 @@ the loader used before).
 |---|---|
 | `LooseModCompiler/` | `modloader/tools/ImportLooseMod.csx` compiled as a program (the `.csx` is the single source of truth; `ScriptHost.cs` supplies `Data`/`EnsureDataLoaded` and UTMT's default script imports). Same command line, env (`DR_MOD_DIRS`, `DR_OUT_PIPE`) and output as `UndertaleModCli load <data.win> -s ImportLooseMod.csx`. |
 | `LooseModCompiler/RuntimeExports.cs` | `[UnmanagedCallersOnly]` entry points (`Ping`, `Compile`) for native hosts. |
-| `RunnerCompiler/` | SPIKE: YYToolkit plugin that hosts the same .NET runtime in the game process. See `RUNTIME_COMPILER.md`. |
+| `RunnerCompiler/` | SPIKE: YYToolkit plugin that hosts the same .NET runtime in the game process, and links and runs `.gmlo` objects on VM runners (link mode). See `RUNTIME_COMPILER.md`. |
 | `tools/compare_runtime_bytecode.py` | Diffs the runner's in-memory bytecode (spike dump) against the data.win it was served. |
 | `tools/runtime_bytecode_fixtures.py` | Pairs a spike named capture with the served data.win: offline/runtime `.bin` files and side-by-side listings. |
 | `fixtures/runtime_bytecode/` | Live-captured runtime vs. pre-fixup bytecode for seven GML snippets (ROADMAP 41). |
 | `tools/bytecode_fixup.py` | The runner's load-time operand fixup (variable/function ids), see RUNTIME_COMPILER.md. |
-| `GmlObjectCompiler/` | GML snippet -> linkable object (`.gmlo`): Underanalyzer bytecode with open reference operands plus relocations. Works against VM and YYC data.win files. Runtime linker for YYC: `modloader/include/gmlo_link.hpp` (RUNTIME_COMPILER.md "YYC: running linked bytecode"). |
-| `tests/` | `python3 -m unittest discover -s compiler/tests`: fixup vs. the runtime fixtures, byte for byte. |
+| `GmlObjectCompiler/` | GML snippet -> linkable object (`.gmlo`): Underanalyzer bytecode with open reference operands plus relocations. Works against VM and YYC data.win files. Runtime linker for VM and YYC: `modloader/include/gmlo_link.hpp` (RUNTIME_COMPILER.md "Linking and running compiled GML"). |
+| `tools/gml_object.py` | Reads `.gmlo` files and links them offline (same rules as `gmlo_link.hpp`). |
+| `fixtures/runtime_link/` | Five snippets as `.gmlo`, a link plan, and the bytes the in-game linker produced on the VM launcher (ROADMAP 4). |
+| `tests/` | `python3 -m unittest discover -s compiler/tests`: fixup and runtime linking vs. the live fixtures, byte for byte. |
 
 ## Build / install
 

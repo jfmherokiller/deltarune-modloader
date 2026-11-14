@@ -22,7 +22,7 @@ Labels used below:
 | script registry + hooks by name | Harmony + interop | `modloader/yyc_interop` (`script_hooks.hpp`) | observe/redirect by name on VM and YYC, verified on both; full detours on YYC only |
 | plugin host: config, logging, load order, dependencies | BepInEx chainloader | `modloader/modhost` (ModHost) | manifests, runner/game filters, dependencies, config path, shared log; verified on VM and YYC |
 | tool bridge (pipe/TCP relay) | (UnityExplorer, debuggers) | `editor/runtime` (RunnerEditor) | read-only telemetry and inspector; verified on VM and YYC |
-| loose GML at runtime | (ScriptEngine) | `compiler/` + `ExecuteCodeObject` | bytecode runs on both runners; operand linking missing |
+| loose GML at runtime | (ScriptEngine) | `compiler/` + `ExecuteCodeObject` | compiled snippets are linked and run on both runners (`gmlo_link.hpp`); one entry point and script replacement missing |
 
 What belongs upstream: only generic, runner-agnostic primitives (execute code, runner type, script
 lookup/hook API) are offered to YYToolkit as PRs. The plugin host and tool bridge stay here, the way
@@ -145,8 +145,13 @@ BepInEx sits on top of its runtime libraries.
    (2026-11-14): `compiler/GmlObjectCompiler` output is linked in-process by
    `modloader/include/gmlo_link.hpp` (runner tables, string-table append, script calls lowered to
    `script_execute`) and runs on Dwarf Eats Mountain's embedded VM; four snippets × 300 runs pass
-   (RUNTIME_COMPILER.md "YYC: running linked bytecode"). Still to do: the VM half and one API for
-   both.
+   (RUNTIME_COMPILER.md "YYC: running linked bytecode"). VM half done (2026-11-14): the same
+   `gmlo::Linker` runs in `compiler/RunnerCompiler` link mode on the DELTARUNE launcher; five
+   snippets (globals, `show_debug_message`, a script call, locals + instance variable + `x`,
+   arrays + strings) × 1000 runs pass with no fault and no growth per run, and new strings are
+   appended to the VM's table (RUNTIME_COMPILER.md "VM: running linked bytecode", fixtures in
+   `compiler/fixtures/runtime_link/`). Still to do: one entry point for both runners
+   (compile-in-game to `.gmlo`), and script replacement with linked code.
 5. **[feature] M: generic loose-asset overrides.** Find `ReadEntireFile` by signature instead of
    by RVA, so the data.win redirect works in other VM games. YYC data.win still holds sprites,
    sounds and strings, so asset mods would also work on YYC games.

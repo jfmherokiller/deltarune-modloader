@@ -1,4 +1,4 @@
-// RunnerCompiler SPIKE (YYToolkit v5 plugin). Read-only toward the game. Two experiments:
+// RunnerCompiler SPIKE (YYToolkit v5 plugin). Four experiments:
 //  1. Bytecode dump: the first distinct scripts the runner executes (CCode* from EVENT_OBJECT_CALL)
 //     have their in-memory VMBuffer copied to mods/aurie/runnercompiler/<name>.bin, so offline tools
 //     can diff them against the data.win bytes the game was served and learn the load-time operand
@@ -9,18 +9,29 @@
 //     the first EVENT_OBJECT_CALL walks the runner's global CCode list (all code entries, executed or
 //     not, already fixed up by the CODE-chunk loader) and copies the bytecode of every matching entry
 //     to runnercompiler/capture/<name>.bin + capture.tsv. Used for compiler/fixtures/runtime_bytecode.
-// Nothing is written back into the game. Results: aurie.log and mods/aurie/runnercompiler/report.txt.
+//  4. Link and run: if mods/aurie/runnercompiler/link.txt exists, the .gmlo objects it lists
+//     (compiler/GmlObjectCompiler output) are linked into runner CCode objects by gmlo::Linker and run
+//     through YYTK ExecuteCodeObject, with checks; results in runnercompiler/link.log. In this
+//     mode experiment 1 is skipped. Needs a YYToolkit with ExecuteCodeObject (fork, 85ce5b9+).
+// Experiments 1-3 write nothing back into the game; experiment 4 executes the linked code.
+// Results: aurie.log and mods/aurie/runnercompiler/report.txt (link.log for experiment 4).
 #include <YYToolkit/YYTK_Shared.hpp>
 #include "ClrHost.hpp"
+#include <gmlo_link.hpp>
+#include <psapi.h>
+#include <algorithm>
 #include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <memory>
 #include <mutex>
 #include <set>
+#include <sstream>
 #include <string>
 #include <thread>
+#include <tuple>
 #include <vector>
 using namespace Aurie;
 using namespace YYTK;
@@ -119,10 +130,229 @@ void CaptureNamed() {
     g_CaptureDone.store(true);
 }
 
+// Experiment 4: link and run Underanalyzer-compiled objects (gmlo::Linker,
+// modloader/include/gmlo_link.hpp, shared with YYCVmProbe on YYC). Plan file
+// runnercompiler/link.txt, one object per line:  <file.gmlo> <runs> [check ; check ...]
+// with checks  "result <v>", "global <name> <v>", "self <name> <v>"  (v: number or text) and
+// "debug <text>" (show_debug_message was called with exactly <text>),
+// evaluated right after the last run. Each EVENT_OBJECT_CALL (after a warm-up) runs every object
+// once against that event's self/other, so the runs spread over many events and frames.
+std::wstring SafeFile(const std::string& name);
+struct LinkCheck { std::string where, name, value; };
+struct LinkJob {
+    std::string file;
+    int runs = 0, done = 0, failures = 0;
+    std::vector<LinkCheck> checks;
+    gmlo::Object object;
+    gmlo::Linked* linked = nullptr;
+};
+std::vector<LinkJob> g_LinkJobs;
+bool g_LinkPlanned = false, g_LinkFinished = false;
+uint64_t g_LinkEvents = 0;
+size_t g_PrivateAtRun10 = 0;
+uint32_t g_RunnerStrings = 0;
+std::unique_ptr<gmlo::Linker> g_Linker;   // game thread only
+std::ofstream g_LinkLog;
+AurieModule* g_Module = nullptr;
+
+// "debug <text>" checks: show_debug_message is hooked while a link plan runs and its messages
+// are kept, so the check does not depend on where the game's debug output goes.
+std::vector<std::string> g_DebugMessages;
+TRoutine g_ShowDebugMessage = nullptr;
+void HookShowDebugMessage(RValue& result, CInstance* self, CInstance* other, int argc, RValue* args) {
+    if (argc > 0 && args && g_DebugMessages.size() < 1000) g_DebugMessages.push_back(args[0].ToString());
+    g_ShowDebugMessage(result, self, other, argc, args);
+}
+
+void LinkLog(const std::string& line) {
+    g_LinkLog << line << "\n"; g_LinkLog.flush();
+    DbgPrintEx(LOG_SEVERITY_INFO, "[RunnerCompiler] %s", line.substr(0, 400).c_str());
+}
+
+size_t PrivateBytes() {
+    PROCESS_MEMORY_COUNTERS pmc{};   // PagefileUsage = private commit (the _EX field fails under Wine)
+    pmc.cb = sizeof pmc;
+    return K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof pmc) ? pmc.PagefileUsage : 0;
+}
+
+bool LoadLinkPlan(const std::wstring& dir) {
+    std::ifstream plan(dir + L"\\link.txt");
+    if (!plan) return false;
+    for (std::string line; std::getline(plan, line);) {
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+        if (line.empty() || line[0] == '#') continue;
+        LinkJob job;
+        std::istringstream in(line);
+        in >> job.file >> job.runs;
+        std::string rest;
+        std::getline(in, rest);
+        for (size_t start = 0; start < rest.size();) {
+            size_t semi = rest.find(';', start);
+            std::istringstream check(rest.substr(start, semi == std::string::npos ? std::string::npos : semi - start));
+            LinkCheck c;
+            check >> c.where;
+            if (c.where == "global" || c.where == "self") check >> c.name;
+            std::getline(check >> std::ws, c.value);
+            while (!c.value.empty() && c.value.back() == ' ') c.value.pop_back();
+            if (!c.where.empty()) job.checks.push_back(c);
+            if (semi == std::string::npos) break;
+            start = semi + 1;
+        }
+        std::ifstream f(dir + L"\\" + std::wstring(job.file.begin(), job.file.end()), std::ios::binary);
+        std::string text((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
+        std::string error;
+        if (!f || !gmlo::Parse(text, job.object, error)) {
+            LinkLog("link plan: " + job.file + ": " + (f ? error : std::string("cannot read")));
+            continue;
+        }
+        g_LinkJobs.push_back(std::move(job));
+    }
+    return true;
+}
+
+bool Matches(const RValue& v, const std::string& expected) {
+    char* end = nullptr;
+    double want = strtod(expected.c_str(), &end);
+    if (end && *end == 0 && !expected.empty()) {
+        const auto kind = v.m_Kind & 0xFFFFFF;
+        return (kind == VALUE_REAL || kind == VALUE_INT32 || kind == VALUE_INT64 || kind == VALUE_BOOL) && v.ToDouble() == want;
+    }
+    return (v.m_Kind & 0xFFFFFF) == VALUE_STRING && v.ToString() == expected;
+}
+
+void RunChecks(LinkJob& job, CInstance* self, const RValue& result) {
+    for (auto& c : job.checks) {
+        std::string got = "(missing)";
+        bool ok = false;
+        if (c.where == "result") { got = result.ToString(); ok = Matches(result, c.value); }
+        else if (c.where == "debug") {
+            for (auto& m : g_DebugMessages) if (m == c.value) { got = m; ok = true; }
+            if (!ok) got = std::to_string(g_DebugMessages.size()) + " message(s), none matching";
+        }
+        else {
+            CInstance* target = self;
+            if (c.where == "global") g_Yytk->GetGlobalInstance(&target);
+            RValue* member = nullptr;
+            if (target && AurieSuccess(g_Yytk->GetInstanceMember(RValue(target), c.name.c_str(), member)) && member) {
+                got = member->ToString(); ok = Matches(*member, c.value);
+            }
+        }
+        LinkLog(std::string("  check ") + (ok ? "PASS" : "FAIL") + ": " + c.where + (c.name.empty() ? "" : " " + c.name) +
+                " == " + c.value + " (got " + got + ")");
+        job.failures += !ok;
+    }
+}
+
+void LinkStep(CInstance* self, CInstance* other, CCode* code) {
+    if (g_LinkFinished || ++g_LinkEvents < 200) return;   // let the game finish its first room
+    // Object events only: their self is a real instance (built-ins like x are valid on it).
+    char name[12]{};
+    if (!code || !code->m_Name || !CopyGuarded(code->m_Name, name, 11) || strncmp(name, "gml_Object_", 11) != 0) return;
+    if (!g_LinkPlanned) {
+        g_LinkPlanned = true;
+        if (!gmlo::HasExecuteCodeObject(g_Yytk)) {
+            LinkLog("link: this YYToolkit.dll has no ExecuteCodeObject (needs the fork, external/YYToolkit 85ce5b9+); nothing linked");
+            g_LinkFinished = true;
+            return;
+        }
+        g_Linker = std::make_unique<gmlo::Linker>(g_Yytk);
+        auto& strings = g_Linker->Strings();
+        if (!strings.Discover()) LinkLog("link: string table not found (" + strings.error + "); string relocations will fail");
+        const uint32_t runnerStrings = strings.Count();
+        char info[256];
+        snprintf(info, sizeof info, "link: %s runner, data.win image %p, string table slot %p (exe+0x%llx), %u strings",
+                 g_Linker->IsYYC() ? "YYC" : "VM", strings.Image(), static_cast<void*>(strings.TableSlot()),
+                 static_cast<unsigned long long>(reinterpret_cast<uintptr_t>(strings.TableSlot()) - reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr))),
+                 runnerStrings);
+        LinkLog(info);
+        PVOID showDebug = nullptr;
+        if (AurieSuccess(g_Yytk->GetNamedRoutinePointer("show_debug_message", &showDebug)) && showDebug &&
+            AurieSuccess(MmCreateHook(g_Module, "show_debug_message", showDebug, reinterpret_cast<PVOID>(HookShowDebugMessage),
+                                      reinterpret_cast<PVOID*>(&g_ShowDebugMessage))))
+            LinkLog("link: show_debug_message hooked for \"debug\" checks");
+        else LinkLog("link: show_debug_message hook FAILED; \"debug\" checks will fail");
+        // Self-test: the YYTK lookups gmlo::Linker uses give the ids the launcher's own bytecode
+        // uses (compiler/fixtures/runtime_bytecode/launcher/links.json).
+        std::string selfTest = "link: resolver self-test (launcher fixture ids):";
+        CInstance* global = nullptr;
+        g_Yytk->GetGlobalInstance(&global);
+        for (auto [kind, name, want] : {std::tuple{'b', "room_speed", 136}, {'b', "x", 0}, {'v', "i", 100049},
+                                       {'f', "method", 162}, {'f', "abs", 200}, {'f', "@@NewGMLArray@@", 2253},
+                                       {'f', "gml_Script_strlen", 100081}}) {
+            int32_t id = -1;
+            size_t builtin = 0;
+            bool ok = kind == 'b' ? AurieSuccess(g_Yytk->GetBuiltinVariableIndex(name, builtin))
+                    : kind == 'v' ? AurieSuccess(g_Yytk->GetVariableSlot(RValue(global), name, id))
+                                  : AurieSuccess(g_Yytk->GetNamedRoutineIndex(name, &id));
+            if (kind == 'b') id = static_cast<int32_t>(builtin);
+            selfTest += std::string(" ") + name + "=" + (ok ? std::to_string(id) : "?") + (ok && id == want ? "" : "(!=" + std::to_string(want) + ")");
+        }
+        LinkLog(selfTest);
+        for (auto& job : g_LinkJobs) {
+            std::string error;
+            job.linked = g_Linker->Link(job.object, error);
+            char line[512];
+            if (job.linked)
+                snprintf(line, sizeof line, "link: %s -> %s, %zu bytes, %zu relocations, %d new strings, CCode %p",
+                         job.file.c_str(), job.linked->name.c_str(), job.linked->words * 4, job.object.relocs.size(),
+                         job.linked->newStrings, job.linked->ccode);
+            else snprintf(line, sizeof line, "link: %s FAILED: %s", job.file.c_str(), error.c_str());
+            LinkLog(line);
+            if (job.linked) {   // linked/<stem>.bin: the bytes as linked (compiler/tests/test_gml_object.py)
+                CreateDirectoryW((g_OutDir + L"\\linked").c_str(), nullptr);
+                std::string stem = job.file.substr(0, job.file.rfind('.'));
+                std::ofstream bin(g_OutDir + L"\\linked\\" + SafeFile(stem) + L".bin", std::ios::binary | std::ios::trunc);
+                bin.write(reinterpret_cast<const char*>(job.linked->code), static_cast<std::streamsize>(job.linked->words * 4));
+            }
+        }
+        g_RunnerStrings = runnerStrings;
+        LinkLog("link: " + std::to_string(runnerStrings) + " runner strings, " + std::to_string(strings.Count() - runnerStrings) +
+                " appended; private bytes " + std::to_string(PrivateBytes()));
+        return;
+    }
+    bool pending = false;
+    for (auto& job : g_LinkJobs) {
+        if (!job.linked || job.done >= job.runs) continue;
+        // Relinking an identical object must hit the cache (no new CCode, no new strings).
+        std::string error;
+        if (g_Linker->Link(job.object, error) != job.linked) { ++job.failures; LinkLog("link: " + job.file + " relink missed the cache"); }
+        RValue result;
+        if (!g_Linker->Run(job.linked, self, other, result, error)) {
+            ++job.failures;
+            LinkLog("run: " + job.file + " #" + std::to_string(job.done + 1) + " FAILED: " + error);
+            if (error.rfind("exception", 0) == 0) { LinkLog("link: stopping after a fault"); g_LinkFinished = true; return; }
+        }
+        if (++job.done == 1 || job.done == job.runs)
+            LinkLog("run: " + job.file + " #" + std::to_string(job.done) + " -> " + result.GetKindName() + " " + result.ToString());
+        if (job.done == job.runs) RunChecks(job, self, result);
+        pending |= job.done < job.runs;
+    }
+    size_t round = 0;
+    for (auto& job : g_LinkJobs) round = std::max<size_t>(round, job.done);
+    if (round == 10 && !g_PrivateAtRun10) g_PrivateAtRun10 = PrivateBytes();
+    static size_t lastSample = 0;
+    if (round != lastSample && (round == 10 || round % 100 == 0)) {
+        lastSample = round;
+        LinkLog("mem: run " + std::to_string(round) + ", private bytes " + std::to_string(PrivateBytes()));
+    }
+    if (!pending) {
+        g_LinkFinished = true;
+        int failures = 0, linked = 0;
+        for (auto& job : g_LinkJobs) { failures += job.failures + !job.linked; linked += job.linked != nullptr; }
+        const size_t now = PrivateBytes();
+        LinkLog("link: done, " + std::to_string(linked) + "/" + std::to_string(g_LinkJobs.size()) + " objects linked, " +
+                std::to_string(g_Linker->LinkedCount()) + " CCode objects, " + std::to_string(g_Linker->Strings().Count() - g_RunnerStrings) +
+                " appended strings, private bytes " + std::to_string(g_PrivateAtRun10) + " at run 10 -> " + std::to_string(now) +
+                " (" + std::to_string(static_cast<long long>(now) - static_cast<long long>(g_PrivateAtRun10)) + "), " +
+                std::to_string(failures) + " failure(s)");
+    }
+}
+
 void CodeCallback(FWCodeEvent& event) {
     if (!g_Prefixes.empty() && !g_CaptureRequested.exchange(true)) CaptureNamed();
-    if (g_Done.load(std::memory_order_relaxed)) return;
     auto& [self, other, code, argc, args] = event.Arguments();
+    if (!g_LinkJobs.empty()) LinkStep(self, other, code);
+    if (g_Done.load(std::memory_order_relaxed)) return;
     Capture(code);
     if (g_Seen.size() >= MaxDumps) g_Done.store(true);
 }
@@ -207,6 +437,7 @@ void Worker() {
         } else log("Compile lookup FAILED: " + host.Error());
     }
     // Experiment 1: flush captured bytecode until the cap is reached (or 60 s pass).
+    if (!g_LinkJobs.empty()) { g_Done.store(true); capture.join(); log("link mode: bytecode dump skipped"); return; }
     size_t written = 0;
     std::ofstream index(g_OutDir + L"\\index.tsv", std::ios::trunc);
     index << "name\tlength\tf0c\tf10\tvmbuffer\tbytecode\n";
@@ -234,6 +465,7 @@ void Worker() {
 EXPORTED AurieStatus ModuleInitialize(IN AurieModule* Module, IN const fs::path& ModulePath) {
     g_Yytk = GetInterface();
     if (!g_Yytk) return AURIE_MODULE_DEPENDENCY_NOT_RESOLVED;
+    g_Module = Module;
     // mods/aurie/RunnerCompiler.dll -> mods/aurie/runnercompiler/, mods/tools/compiler/
     const auto aurieDir = ModulePath.parent_path();
     g_OutDir = (aurieDir / L"runnercompiler").wstring();
@@ -244,6 +476,12 @@ EXPORTED AurieStatus ModuleInitialize(IN AurieModule* Module, IN const fs::path&
             while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
             if (!line.empty() && line[0] != '#') g_Prefixes.push_back(line);
         }
+    }
+    if (GetFileAttributesW((g_OutDir + L"\\link.txt").c_str()) != INVALID_FILE_ATTRIBUTES) {
+        g_LinkLog.open(g_OutDir + L"\\link.log", std::ios::trunc);
+        LoadLinkPlan(g_OutDir);
+        LinkLog("link plan: " + std::to_string(g_LinkJobs.size()) + " object(s)");
+        if (!g_LinkJobs.empty()) g_Done.store(true);   // no bytecode dump in link mode
     }
     const auto status = g_Yytk->CreateCallback(Module, EVENT_OBJECT_CALL, CodeCallback, 0);
     if (!AurieSuccess(status)) return status;

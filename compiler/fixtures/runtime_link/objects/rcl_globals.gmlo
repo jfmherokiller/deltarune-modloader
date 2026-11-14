@@ -1,0 +1,13 @@
+GMLO 1
+name gml_GlobalScript_rcl_globals
+locals 1
+args 0
+local arguments
+code c0060000 0000047c 07560000 d9020001 00000000 07450000 12040000 b8000004 840f0000 4525fffb a0000000 c005fffb a0000000 840f0001 0c520000 4555fffb a0000000 c205fffb a0000000 9c050000
+reloc 0 string rcl_counter
+reloc 12 func variable_global_exists
+reloc 36 var -5 rcl_counter
+reloc 44 var -5 rcl_counter
+reloc 60 var -5 rcl_counter
+reloc 68 var -5 rcl_counter
+end

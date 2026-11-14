@@ -1,0 +1,17 @@
+GMLO 1
+name gml_GlobalScript_rcl_strings
+locals 2
+args 0
+local arguments
+local parts
+code c0020000 556e7caa ff0ffffb c0060000 00000486 07560000 c0060000 00000487 07560000 d9020002 00000000 4555fff9 a0000000 840ffff9 840f0001 c0050000 00000000 c0060000 00000488 0c560000 c105fff9 a0000000 d9020001 00000000 d9020001 00000000 0c550000 9c050000
+reloc 12 string rcl new string
+reloc 24 string linked
+reloc 36 func @@NewGMLArray@@
+reloc 44 var -7 parts
+reloc 60 var -1 parts
+reloc 68 string :
+reloc 80 var -7 parts
+reloc 88 func array_length
+reloc 96 func string
+end

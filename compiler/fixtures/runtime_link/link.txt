@@ -1,0 +1,6 @@
+# <object> <runs> [checks]
+rcl_globals.gmlo   1000  result 1000 ; global rcl_counter 1000
+rcl_debug.gmlo     1000  result 1000 ; global rcl_debug_runs 1000 ; debug [rcl] linked bytecode says hello, run 1 ; debug [rcl] linked bytecode says hello, run 100
+rcl_script.gmlo    1000  result 107 ; global rcl_strlen 107
+rcl_instance.gmlo  1000  self rcl_sum 45
+rcl_strings.gmlo   1000  result rcl new string:2

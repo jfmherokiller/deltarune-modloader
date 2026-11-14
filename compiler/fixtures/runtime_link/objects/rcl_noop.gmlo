@@ -1,0 +1,7 @@
+GMLO 1
+name gml_GlobalScript_rcl_noop
+locals 1
+args 0
+local arguments
+code 840f0000 07520000 9c050000
+end

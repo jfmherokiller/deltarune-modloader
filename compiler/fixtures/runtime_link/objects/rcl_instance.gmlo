@@ -1,0 +1,20 @@
+GMLO 1
+name gml_GlobalScript_rcl_instance
+locals 3
+args 0
+local arguments
+local s
+local i
+code 840f0000 4525fff9 a0000000 840f0000 4525fff9 a0000000 c105fff9 a0000000 840f000a 15520100 b800000f c005fff9 a0000000 c105fff9 a0000000 0c550000 4555fff9 a0000000 c005fff9 a0000000 c00f0001 0c520000 4555fff9 a0000000 b67fffee c105fff9 a0000000 4555ffff a0000000 c005ffff a0000000 9c050000
+reloc 4 var -7 s
+reloc 16 var -7 i
+reloc 24 var -7 i
+reloc 44 var -7 s
+reloc 52 var -7 i
+reloc 64 var -7 s
+reloc 72 var -7 i
+reloc 88 var -7 i
+reloc 100 var -7 s
+reloc 108 var -1 rcl_sum
+reloc 116 var -1 x
+end

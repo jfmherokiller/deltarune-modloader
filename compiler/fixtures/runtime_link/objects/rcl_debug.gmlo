@@ -1,0 +1,18 @@
+GMLO 1
+name gml_GlobalScript_rcl_debug
+locals 1
+args 0
+local arguments
+code c0060000 00000479 07560000 d9020001 00000000 07450000 b8000006 c205fffb a0000000 840f0001 0c520000 b6000003 840f0001 07520000 4555fffb a0000000 c205fffb a0000000 840f0001 15520300 b7000006 c205fffb a0000000 840f0064 15520300 b6000002 c00f0001 b800000b c0060000 0000047a c205fffb a0000000 d9020001 00000000 0c650000 d9020001 00000000 9e050000 c205fffb a0000000 9c050000
+reloc 0 string rcl_debug_runs
+reloc 12 func variable_global_exists
+reloc 28 var -5 rcl_debug_runs
+reloc 56 var -5 rcl_debug_runs
+reloc 64 var -5 rcl_debug_runs
+reloc 84 var -5 rcl_debug_runs
+reloc 112 string [rcl] linked bytecode says hello, run 
+reloc 120 var -5 rcl_debug_runs
+reloc 128 func string
+reloc 140 func show_debug_message
+reloc 152 var -5 rcl_debug_runs
+end

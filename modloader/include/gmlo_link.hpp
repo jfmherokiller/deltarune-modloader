@@ -325,16 +325,80 @@ namespace gmlo
 		int newStrings = 0;           // strings appended to the runner's table
 	};
 
+	// True if this process's YYToolkit implements YYTKInterface::ExecuteCodeObject (and
+	// IsYYCRunner). Older builds have a shorter interface vtable: calling the missing slot jumps
+	// into data and crashes the game, so check before constructing a Linker. A virtual is called
+	// through a pointer-to-member via a vcall thunk, MSVC "jmp [rax+disp]" or clang-cl
+	// "mov rax,[rax+disp]; jmp rax"; disp is the slot's byte offset in the vtable.
+	inline bool HasExecuteCodeObject(YYTK::YYTKInterface* yytk)
+	{
+		auto member = &YYTK::YYTKInterface::ExecuteCodeObject;
+		const uint8_t* thunk = nullptr;
+		memcpy(&thunk, &member, sizeof(thunk));
+		MEMORY_BASIC_INFORMATION mbi{};
+		if (!yytk || !thunk || !VirtualQuery(thunk, &mbi, sizeof(mbi)) || mbi.State != MEM_COMMIT) return false;
+		if (thunk[0] == 0xE9) thunk += 5 + *(const int32_t*)(thunk + 1);   // incremental-link stub
+		long disp = -1;
+		for (int i = 0; i < 16 && disp < 0; i++)
+		{
+			const bool jmp = thunk[i] == 0xFF, mov = thunk[i] == 0x48 && thunk[i + 1] == 0x8B;
+			if (!jmp && !mov) continue;
+			const uint8_t modrm = mov ? thunk[i + 2] : thunk[i + 1];
+			const uint8_t* at = thunk + i + (mov ? 3 : 2);
+			if (modrm == (jmp ? 0x60 : 0x40)) disp = *at;
+			else if (modrm == (jmp ? 0xA0 : 0x80)) disp = *(const int32_t*)at;
+		}
+		if (disp < 0) return false;
+		void* entry = (*(void***)yytk)[disp / 8];
+		return entry && VirtualQuery(entry, &mbi, sizeof(mbi)) &&
+			(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY));
+	}
+
 	class Linker
 	{
 	public:
+		// Check HasExecuteCodeObject(yytk) first: IsYYCRunner is part of the same interface addition.
 		explicit Linker(YYTK::YYTKInterface* yytk) : m_Yytk(yytk) { m_Yyc = yytk->IsYYCRunner(); }
 
 		bool IsYYC() const { return m_Yyc; }
+		size_t LinkedCount() const { return m_Cache.size(); }
 		RunnerStrings& Strings() { return m_Strings; }
 
 		// Links `obj` against the running game. On failure returns nullptr and sets `err`.
+		// Linking the same object again (same name, code and relocations) returns the first
+		// result, so relinking never allocates.
 		Linked* Link(const Object& obj, std::string& err)
+		{
+			std::string key = obj.name;
+			key.append(1, '\0').append((const char*)obj.code.data(), obj.code.size() * 4);
+			for (auto& r : obj.relocs) key.append(1, '\0').append(std::to_string(r.offset)).append(r.kind).append(1, ':').append(r.name);
+			if (auto it = m_Cache.find(key); it != m_Cache.end()) return it->second;
+			Linked* linked = LinkNew(obj, err);
+			if (linked) m_Cache.emplace(std::move(key), linked);
+			return linked;
+		}
+
+		// Runs linked code as `self` (and `other`); SEH-guarded. Returns false on a fault or a
+		// false Code_Execute, with `err` set. The VM's own state is not unwound after a fault;
+		// treat the process as unstable and stop running linked code.
+		bool Run(Linked* l, CInstance* self, CInstance* other, RValue& result, std::string& err)
+		{
+			AurieStatus st = AURIE_SUCCESS;
+			Fault f{};
+			DWORD ex = SehRun(l->ccode, self, other, &result, &st, &f);
+			if (ex)
+			{
+				char b[160];
+				snprintf(b, sizeof(b), "exception 0x%08lX at %s, address 0x%llx", ex, Where(f.address).c_str(), (unsigned long long)f.target);
+				err = b;
+				return false;
+			}
+			if (!AurieSuccess(st)) { err = std::string("ExecuteCodeObject: ") + AurieStatusToString(st); return false; }
+			return true;
+		}
+
+	private:
+		Linked* LinkNew(const Object& obj, std::string& err)
 		{
 			std::vector<uint32_t> code = obj.code;
 			std::vector<Reloc> relocs = obj.relocs;
@@ -406,17 +470,7 @@ namespace gmlo
 			return out;
 		}
 
-		// Runs linked code as `self` (and `other`); SEH-guarded. Returns false on a fault or a
-		// false Code_Execute, with `err` set.
-		bool Run(Linked* l, CInstance* self, CInstance* other, RValue& result, std::string& err)
-		{
-			AurieStatus st = AURIE_SUCCESS;
-			DWORD ex = SehRun(l->ccode, self, other, &result, &st);
-			if (ex) { char b[64]; snprintf(b, sizeof(b), "exception 0x%08lX", ex); err = b; return false; }
-			if (!AurieSuccess(st)) { err = std::string("ExecuteCodeObject: ") + AurieStatusToString(st); return false; }
-			return true;
-		}
-
+	public:
 		// Runs `push.s index; conv.s.v; ret.v` and returns the string the VM produced.
 		bool ReadRunnerString(uint32_t index, std::string& value, std::string& err)
 		{
@@ -438,6 +492,35 @@ namespace gmlo
 		YYTK::YYTKInterface* m_Yytk;
 		bool m_Yyc = false;
 		RunnerStrings m_Strings;
+		std::map<std::string, Linked*> m_Cache;   // never freed, see the header comment
+
+		struct Fault { uintptr_t address = 0, target = 0; };
+
+		static DWORD Record(EXCEPTION_POINTERS* info, Fault* f)
+		{
+			if (info && info->ExceptionRecord)
+			{
+				f->address = (uintptr_t)info->ExceptionRecord->ExceptionAddress;
+				if (info->ExceptionRecord->NumberParameters >= 2) f->target = info->ExceptionRecord->ExceptionInformation[1];
+			}
+			return EXCEPTION_EXECUTE_HANDLER;
+		}
+
+		// "module+0xRVA" for a code address.
+		static std::string Where(uintptr_t a)
+		{
+			HMODULE m = nullptr;
+			char path[MAX_PATH] = {}, b[MAX_PATH + 32];
+			if (!a || !GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, (LPCSTR)a, &m))
+			{
+				snprintf(b, sizeof(b), "0x%llx", (unsigned long long)a);
+				return b;
+			}
+			GetModuleFileNameA(m, path, MAX_PATH);
+			const char* leaf = strrchr(path, '\\');
+			snprintf(b, sizeof(b), "%s+0x%llx", leaf ? leaf + 1 : path, (unsigned long long)(a - (uintptr_t)m));
+			return b;
+		}
 
 		static void* MakeCCode(uint32_t* code, size_t words, const Object& obj)
 		{
@@ -457,10 +540,10 @@ namespace gmlo
 			return cc;
 		}
 
-		DWORD SehRun(void* cc, CInstance* self, CInstance* other, RValue* result, AurieStatus* st)
+		DWORD SehRun(void* cc, CInstance* self, CInstance* other, RValue* result, AurieStatus* st, Fault* f)
 		{
 			__try { *st = m_Yytk->ExecuteCodeObject(self, other, (CCode*)cc, *result, 0); return 0; }
-			__except (EXCEPTION_EXECUTE_HANDLER) { return GetExceptionCode(); }
+			__except (Record(GetExceptionInformation(), f)) { return GetExceptionCode(); }
 		}
 
 		// Inserts 3 words before each script call and fixes branch offsets and relocation offsets.

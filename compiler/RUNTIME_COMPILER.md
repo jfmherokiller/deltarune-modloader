@@ -21,20 +21,19 @@ and could later live in YYToolkit.
    UndertaleModLib. The general version implements Underanalyzer's `IGameContext` from the live
    runner: asset names, built-in and script function tables, and the variable list. YYToolkit
    already exposes most of these lookups. With that, the managed side needs no data.win at all.
-3. **Linking and injection** (fixup derived, injection TODO). The runner rewrites bytecode
-   operands while it loads the CODE chunk: variable and function references become runtime ids.
-   String indices are not rewritten. The rules are in "Load-time operand fixup" below, and
-   `tools/bytecode_fixup.py` implements them. Injected bytecode has to get the same fixup. After that, `CCode->m_VmInstance`
-   (VMBuffer: length @8, bytecode @24) is pointed at the new buffer between frames, on the game
-   thread. The spike's dump experiment collects the data needed for this:
-   ```
-   python3 compiler/tools/compare_runtime_bytecode.py <served data.win> <game>/mods/aurie/runnercompiler
-   ```
-   It lists which instruction words differ between the file and memory, grouped by opcode.
+3. **Linking and running** (done on VM and YYC). The runner rewrites bytecode operands while it
+   loads the CODE chunk: variable and function references become runtime ids. String indices
+   are not rewritten. The rules are in "Load-time operand fixup" below, and
+   `tools/bytecode_fixup.py` implements them offline. Compiled snippets get the same fixup at run
+   time from `modloader/include/gmlo_link.hpp` (`gmlo::Linker`), which resolves every name
+   against the live runner, wraps the code in a hand-built `CCode` and runs it through YYTK
+   `ExecuteCodeObject`. See "Linking and running compiled GML" below (API) and the per-runner
+   sections. Replacing an existing script's code (pointing `CCode->m_VmInstance` at a linked
+   buffer) is not done yet.
 
 ## Spike plugin (`RunnerCompiler/`, `build.sh`)
 
-The plugin is read-only toward the game. On load it:
+The plugin is read-only toward the game unless a link plan is installed. On load it:
 - starts the CLR on a worker thread and compiles a test snippet, writing the result to
   `mods/aurie/runnercompiler/report.txt` and `aurie.log`;
 - dumps the VMBuffer bytecode of the first 400 distinct scripts that run, writing `index.tsv`
@@ -44,7 +43,9 @@ The plugin is read-only toward the game. On load it:
   covers every code entry, whether it has run or not, and the bytes are already fixed up. It
   copies each matching entry's VMBuffer to `runnercompiler/capture/<name>.bin`, with metadata in
   `capture.tsv`. The list head is a static RVA (`0x8C9EC8`, RE/10), so the walk only runs when the
-  exe's TimeDateStamp is `0x685E7007`. Otherwise it logs "named capture skipped".
+  exe's TimeDateStamp is `0x685E7007`. Otherwise it logs "named capture skipped";
+- if `mods/aurie/runnercompiler/link.txt` exists, it links and runs the `.gmlo` objects listed
+  there and skips the dump ("VM: running linked bytecode" below).
 
 To disable it, rename `mods/aurie/RunnerCompiler.dll` to `RunnerCompiler.dll.off`.
 
@@ -170,16 +171,19 @@ Reference-type bits are kept. The instance type is in the opcode word and is not
 
 - **Built-in** (VARI var id or instance type `-6`, e.g. `x`, `y`, `image_alpha`,
   `room_speed`, `argument0`): the runner's built-in variable index. It is not in data.win.
-  The fixtures read these off the runtime dump. Live injection must look them up by name in
-  the runner's built-in variable table (which runner function to call is not pinned down yet).
+  The fixtures read these off the runtime dump. At run time YYTK `GetBuiltinVariableIndex`
+  returns the same index (checked live on the launcher: `room_speed` 136, `x` 0).
 - **User** (everything else, any instance type: self, other, global, local, stack-top, array):
   `100000 + slot`. While loading, the runner walks VARI in file order and finds-or-adds each
   non-built-in name in **one** table shared by self, global and local variables; the slot is the
   insertion index. So a local `i` and an instance `i` have the same id. The fixtures confirm it
   over all 463 slots: local `i` is slot 49, from game code early in VARI, and the fixture names
   are 444–462 at the end.
-- A name the runner has never seen is assumed to get the next free slot (`Resolver.var_id`).
-  This is not yet observed live. Check it when injection exists.
+- A name the runner has never seen gets the next free slot (`Resolver.var_id`). Observed live on
+  both runners: YYTK `GetVariableSlot` (the runner's `Code_Variable_FindAlloc_Slot_From_Name`)
+  returns the id (100000 + slot) and allocates new names in call order. "Next free" means the
+  runner's live count, not the data.win's: on the launcher the first new name got slot 447
+  although VARI defines 444, because the game had created 3 names at run time before.
 
 ### Rule F: function references
 
@@ -228,9 +232,76 @@ from bytecode_fixup import Reloc, Resolver, apply_fixup
 linked = apply_fixup(code, relocs, resolver)   # relocs: [Reloc(offset, "var"|"func", name, inst_type)]
 ```
 
-For live injection, back `Resolver` with the runner's own tables: built-in variables and
-routines by name, user variables via the runner's variable-name table, and scripts via SCPT or
-the runner's script list. Do not use data.win.
+For live injection the runner's own tables back the same rules: `gmlo::Linker` (C++, in the
+game) and `tools/gml_object.py` (offline, the same `.gmlo` format) are described in "Linking and
+running compiled GML" below.
+
+## Linking and running compiled GML (ROADMAP 4)
+
+Three steps, the same on VM and YYC runners:
+
+1. **Compile** (offline): `compiler/GmlObjectCompiler` turns a GML snippet into a linkable object
+   (`.gmlo`, text): Underanalyzer's bytecode with every reference operand left open, plus a
+   relocation table. The data.win is only the compile context (asset names, scripts, version).
+   ```sh
+   dotnet build -c Release compiler/GmlObjectCompiler -o compiler/build/gmlobj
+   compiler/build/gmlobj/GmlObjectCompiler <game>/data.win <out dir> snippet.gml...   # -> <out>/snippet.gmlo
+   ```
+   The code entry is `gml_GlobalScript_<stem>` unless the file stem already starts with `gml_`.
+   Format (one record per line; `tools/gml_object.py` documents and reads it):
+   ```
+   GMLO 1
+   name gml_GlobalScript_rcl_globals
+   locals 1
+   args 0
+   local arguments                           # informational
+   code c0060000 0000047c 07560000 ...       # u32 words, hex; open operands hold 0 / the ref bits
+   reloc 0 string rcl_counter                # offset = instruction; operand word = offset + 4
+   reloc 12 func variable_global_exists
+   reloc 36 var -5 rcl_counter               # var <compile-time instance type> <name>
+   end
+   ```
+2. **Link** (in the game, game thread): `modloader/include/gmlo_link.hpp`, header-only.
+   ```cpp
+   #include <gmlo_link.hpp>
+   if (!gmlo::HasExecuteCodeObject(yytk)) return;          // YYToolkit without it would crash
+   gmlo::Linker linker(yytk);                               // keep it for the process lifetime
+   gmlo::Object obj; std::string err;
+   if (!gmlo::Parse(gmloText, obj, err)) ...;
+   gmlo::Linked* code = linker.Link(obj, err);              // nullptr + err on an unknown name
+   ```
+   | Operand | Linked to | From |
+   |---|---|---|
+   | `var` | `(ref-type bits) \| id`: built-in index, else 100000 + slot | YYTK `GetBuiltinVariableIndex` (not for locals); else `GetVariableSlot`, which registers new names |
+   | `func` | built-in routine index, or 100000 + script index | YYTK `GetNamedRoutineIndex` (`Code_Function_Find`) |
+   | `string` | index in the runner's string table | existing strings by content; new ones appended (`gmlo::RunnerStrings`) |
+
+   On YYC, `call.i` of a script is also lowered to `script_execute` (YYC section). The linked words
+   go into a zeroed `VMBuffer` (length, bytecode) and a zeroed `CCode` (kind 1, VMBuffer, name,
+   index -1, locals, args; compiled function null). Linking an identical object again returns the
+   cached `Linked`, so relinking does not allocate.
+3. **Run**:
+   ```cpp
+   RValue result;
+   if (!linker.Run(code, self, other, result, err)) ...;   // err: "exception 0x... at module+0x..." or a Code_Execute failure
+   ```
+   `Run` calls YYTK `ExecuteCodeObject` (the runner's `Code_Execute`) under SEH. `self` must be a
+   real instance if the code touches instance or built-in instance variables. The return value of
+   the snippet lands in `result`.
+
+Rules:
+- **Game thread only**, e.g. from an `EVENT_OBJECT_CALL` or `EVENT_FRAME` callback.
+- **Never free linked code.** `VMBuffer::Prepare` caches the threaded form of a buffer by its
+  bytecode address; a new buffer at a freed address would run the old code. Each distinct object
+  costs a few hundred bytes for the life of the process; running it again costs nothing.
+- **After a fault, stop.** SEH catches it, but the VM's frame state is not unwound.
+- **YYToolkit must have `ExecuteCodeObject`** (the fork, `external/YYToolkit` 85ce5b9 or later;
+  build with `tools/build_yytoolkit.sh`). `gmlo::HasExecuteCodeObject` checks the interface vtable
+  first. The `YYToolkit.dll` installed in the test game (2026-11-08 build) does not have it: the
+  call jumped into YYToolkit's data and crashed the game.
+- Snippets cannot declare functions yet (`GmlObjectCompiler` rejects child entries).
+
+Users: `compiler/RunnerCompiler` link mode (VM, below) and `modloader/yyc_vm_probe` (YYC).
 
 ## YYC: running linked bytecode (ROADMAP 4, YYC half)
 
@@ -283,7 +354,7 @@ VM runner:
 | `VMBuffer*` | `+0x68` | the linked buffer |
 | name | `+0x80` | the object's name |
 | script index | `+0x88` | -1 |
-| compiled function | `+0x90` | **null.** This is the only YYC-specific field. On YYC, `Code_Execute` calls it when it is set and falls through to `VM::Exec` when it is null. On VM, RE/10 has a metadata pointer here |
+| compiled function | `+0x90` | **null.** This is the only YYC-specific field. On YYC, `Code_Execute` calls it when it is set and falls through to `VM::Exec` when it is null. The VM runner's `Code_Execute` makes the same check (`call [[+0x90]+8]`), so null is right there too |
 | local count | `+0xA0` | `.gmlo` `locals` (`VM::Exec` makes a locals object when > 0) |
 | argument count | `+0xA4` | `.gmlo` `args` |
 | `VMBuffer` size | `0x30` | allocated zeroed (no vtable needed: it is never destroyed) |
@@ -319,8 +390,8 @@ hundred bytes per linked object on purpose.
   `0x1B6F780`). A string the game already has keeps its index. A new string is appended: its
   text goes into memory within 4 GB above the image (the table holds 32-bit offsets), and the
   table pointer is swapped to a grown copy. Each appended string is read back through the VM's
-  own `push.s` (`ReadRunnerString`), and every one matched. Whether DELTARUNE's VM runner reads
-  strings the same way is not checked yet; if it does, the same code covers new strings on VM.
+  own `push.s` (`ReadRunnerString`), and every one matched. DELTARUNE's VM runner reads strings
+  the same way, and the same code appends new strings there (see the VM section).
 - Variable and built-in-call operands are the same as on VM: `(ref bits) | id`, and the whole id.
 
 ### Reproduce (Linux, Wine)
@@ -351,6 +422,104 @@ to count the messages.
   untested on YYC.
 - `RunnerStrings` assumes the runner keeps the image pointer and the table pointer in the exe's
   own data section. If either is missing, the linker refuses string relocations.
+
+## VM: running linked bytecode (ROADMAP 4, VM half)
+
+Verified 2026-11-14 on the DELTARUNE launcher (VM runner, `DELTARUNE.exe` stamp `0x685E7007`,
+vanilla `data.win`, Proton CachyOS 11) with the RunnerCompiler plugin's link mode and the fork
+YYToolkit. Five snippets were compiled with Underanalyzer against the launcher's data.win,
+linked by `gmlo::Linker` and run 1000 times each, once per object event, against that event's
+instance. Every check passed, with no fault. Fixtures, plan and logs:
+`compiler/fixtures/runtime_link/`.
+
+| Snippet | Covers | Verified outside the bytecode (YYTK / hooked built-in) |
+|---|---|---|
+| `rcl_globals` | `variable_global_exists`, global set, `+=`, read-back | result 1000; `global.rcl_counter` = 1000 |
+| `rcl_debug` | `show_debug_message` with a new string, `string()`, ternary | `show_debug_message` (hooked) received `"[rcl] linked bytecode says hello, run 1"` and `"..., run 100"`; `global.rcl_debug_runs` = 1000 |
+| `rcl_script` | call to the launcher script `gml_Script_strlen` and the built-in `abs` | result and `global.rcl_strlen` = `strlen("linked!") + abs(-100)` = 107 |
+| `rcl_instance` | locals, a `for` loop, an instance variable on `self`, built-in `x` | `self.rcl_sum` = 45 on the running instance; the result is that instance's `x` |
+| `rcl_strings` | array literal (`@@NewGMLArray@@`), `array_length`, string concatenation | result `"rcl new string:2"` |
+
+What the run showed:
+- **Ids.** All lookups agree with the ids the launcher's own bytecode uses
+  (`fixtures/runtime_bytecode/launcher/links.json`): `room_speed` 136, `x` 0, `i` 100049,
+  `method` 162, `abs` 200, `@@NewGMLArray@@` 2253, `gml_Script_strlen` 100081. On this runner
+  `GetVariableSlot` returns the full id (100000 + slot). New names got 100447–100452 in link
+  order.
+- **Strings.** `RunnerStrings` found the image pointer and the string table slot by value; the
+  slot is exe+`0x6A9E20`, the global the `push.s` handler reads (`VM_Exec.cpp`, `0x1401C8B55`:
+  `mov edx, [table + i*4]; rbx = image + 4 + edx`). The STRG chunk handler sets it to
+  `image + STRG + 12` (`0x1400B7631`), so the original table lives inside the data.win image and
+  is never freed on its own; swapping in a grown copy is safe. 1144 strings were found, 7
+  appended (1144–1150), and they print and compare correctly.
+- **`CCode`.** The zeroed `CCode`/`VMBuffer` from the YYC section works unchanged. The VM
+  runner's `Code_Execute` (`0x1401BBC90`) reads kind `+0x10` (1 or 2 run code, 3 returns a
+  constant), the compiled function `+0x90` (if set it is called instead, as on YYC), the
+  VMBuffer `+0x68` (length > 0). `VM::Exec` (`0x1401CFCF0`) reads name `+0x80`, the debug
+  buffer `+0x70`, `+0x78`, start offset `+0x9C` (0) and argument count `+0xA4`, and creates the
+  locals object. No vtable is needed.
+- **Linked bytes are deterministic**: three runs produced identical buffers
+  (`fixtures/runtime_link/linked/`), and `tests/test_gml_object.py` reproduces them offline.
+- **Memory.** Private bytes, sampled every 100 runs: the full plan and a control plan that runs
+  an empty snippet (`return 0;`) both grow about 1 MB over runs 10–1000, all of it before run
+  500 while the launcher settles; from run 500 to 1000 both stay within 0.1 MB. Relinking each
+  object before every run returned the cached object each time (1000 of 1000). In two earlier
+  runs of the full plan, private bytes at run 10 were still lower (116–121 MB) and rose 15–17 MB
+  before run 400 to the same 133–136 MB level, then stayed flat: the launcher was still loading
+  when the runs started.
+
+### Link mode in the RunnerCompiler plugin
+
+`mods/aurie/runnercompiler/link.txt` lists objects (paths relative to that folder), run counts
+and checks:
+
+```
+# <object> <runs> [check ; check ...]
+rcl_globals.gmlo   1000  result 1000 ; global rcl_counter 1000
+rcl_debug.gmlo     1000  debug [rcl] linked bytecode says hello, run 1
+rcl_instance.gmlo  1000  self rcl_sum 45
+```
+
+Checks run after the last run: `result <v>` (the snippet's return value), `global <name> <v>`,
+`self <name> <v>` (read with YYTK `GetInstanceMember`), and `debug <text>` (`show_debug_message`
+was called with exactly that text; the plugin hooks the built-in, because the game's stdout is
+lost under Proton). Numbers compare as numbers, anything else as a string. The plugin waits 200
+object events, links everything on the first object event after that, then runs each object
+once per object event (`gml_Object_*` only, so `self` is a real instance). It writes
+`runnercompiler/link.log` and the linked bytes to `runnercompiler/linked/<stem>.bin`, logs
+private bytes every 100 runs, and stops at the first fault.
+
+### Reproduce (Linux + Proton)
+
+```sh
+G=<game dir>
+compiler/RunnerCompiler/build.sh && tools/build_yytoolkit.sh       # plugin; fork YYToolkit (out/yytk)
+dotnet build -c Release compiler/GmlObjectCompiler -o compiler/build/gmlobj
+F=compiler/fixtures/runtime_link
+compiler/build/gmlobj/GmlObjectCompiler $G/data.win /tmp/gmlo $F/src/*.gml    # or use $F/objects
+# back up mods/aurie/{RunnerCompiler.dll,YYToolkit.dll,runnercompiler/}, aurie.log, mods/*.log
+cp compiler/RunnerCompiler/build/RunnerCompiler.dll out/yytk/YYToolkit.dll $G/mods/aurie/
+cp $F/objects/*.gmlo $F/link.txt $G/mods/aurie/runnercompiler/
+# run the launcher as in "Live run and fixtures" step 4 for ~75 s, then kill DELTARUNE.exe
+cat $G/mods/aurie/runnercompiler/link.log
+python3 -m unittest discover -s compiler/tests                       # offline link == live bytes
+DR_LAUNCHER_WIN=$G/data.win python3 -m unittest discover -s compiler/tests   # + load-order checks
+# restore the backups
+```
+
+`link_noop.txt` is the memory control. The snippets need the vanilla launcher (`rcl_script`
+calls `gml_Script_strlen`; the expected ids in the tests are the launcher's).
+
+### Limitations (VM)
+
+- Only whole snippets run, through `Code_Execute`. Swapping a linked buffer into an existing
+  script's `CCode` (script replacement) and calling linked code from other GML are not done.
+- Function declarations, `static`, and anything else that creates child entries are rejected
+  by `GmlObjectCompiler`.
+- Snippets are compiled against a data.win offline. The in-process compiler
+  (`RuntimeExports.Compile`) does not emit `.gmlo` yet, so compile-in-game is still two steps.
+- The memory figures are process-level; they show no growth per run, not a byte-exact
+  accounting of the runner's heap.
 
 ## Generalizing
 

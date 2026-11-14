@@ -1,0 +1,22 @@
+link plan: 1 object(s)
+linker: CCode vtable 000000014050DE30, VMBuffer vtable 00000001404E7908, slot("i") = 100049 -> id bias 0
+linker: data.win at 0000000003080060 (FORM 2953210 bytes), string table 00000000030C1AAC (global 00000001406A9E20), 1144 strings
+link: show_debug_message hooked for "debug" checks
+link: resolver self-test (launcher fixture ids): room_speed=136 x=0 i=100049 method=162 abs=200 @@NewGMLArray@@=2253 gml_Script_strlen=100081
+link: rcl_noop.gmlo -> gml_GlobalScript_rcl_noop, 12 bytes, 0 relocations, 0 new strings, CCode 000000000303F840
+link: 1144 runner strings, 0 appended; private bytes 132624384
+run: rcl_noop.gmlo #1 -> number 0
+mem: run 10, private bytes 132681728
+mem: run 100, private bytes 132694016
+mem: run 200, private bytes 132714496
+mem: run 300, private bytes 132907008
+mem: run 400, private bytes 133623808
+mem: run 500, private bytes 133644288
+mem: run 600, private bytes 133652480
+mem: run 700, private bytes 133660672
+mem: run 800, private bytes 133672960
+mem: run 900, private bytes 133677056
+run: rcl_noop.gmlo #1000 -> number 0
+  check PASS: result == 0 (got 0)
+mem: run 1000, private bytes 133685248
+link: done, 1/1 objects linked, 1 CCode objects, 0 appended strings, private bytes 132681728 at run 10 -> 133685248 (1003520), 0 failure(s)

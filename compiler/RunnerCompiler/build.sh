@@ -9,7 +9,7 @@ cp "$YY"/source/YYTK/Shared/YYTK_Shared* build/include/YYToolkit/
 cp "$YY/include/Aurie/shared.hpp" build/include/Aurie/
 cp "$YY/include/FunctionWrapper/FunctionWrapper.hpp" build/include/FunctionWrapper/
 CXX=(clang-cl "${CLCOMMON[@]}" /std:c++latest /EHsc /O2 /MD /W3 /DNDEBUG /DNOMINMAX /Fobuild/)
-"${CXX[@]}" /LD /DYYTK_DEFINE_INTERNAL=0 /I build/include /I native \
+"${CXX[@]}" /LD /DYYTK_DEFINE_INTERNAL=0 /I build/include /I native /I ../../modloader/include \
     native/ModuleMain.cpp native/ClrHost.cpp build/include/YYToolkit/YYTK_Shared_Types.cpp \
     /link "${LINKCOMMON[@]}" /OUT:build/RunnerCompiler.dll /IMPLIB:build/RunnerCompiler.lib /INCREMENTAL:NO user32.lib shell32.lib
 "${CXX[@]}" native/ClrHost.cpp tests/clrhost-test.cpp /Fe:build/clrhost-test.exe /link "${LINKCOMMON[@]}"
