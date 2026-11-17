@@ -265,8 +265,10 @@ locations and code-entry evidence for each one.
 38. **[test] S: Windows builds and the release workflow.** Not run since the thin-proxy change:
     `modloader/build.bat`, `loosemods/build.bat`, `modhost/build.bat`, `yyc_interop/build.bat`,
     `.github/workflows/release.yml`.
-39. **[feature] S: `log_scripts` for scripts too.** LooseMods logs only what passes through
-    `Code_Execute` (events, global scripts). `gm::Observe("")` would add script calls on VM.
+39. ~~**[feature] S: `log_scripts` for scripts too.**~~ Done (2026-11-17): `log_scripts` now
+    also logs script calls through `gm::Observe("")` (VM), and tags each line with the loose
+    mod that provides the code; `log_scripts=2` logs mod code only. Verified on the launcher
+    under Proton. Docs: "Checking that your code runs" in `modloader/README.md`.
 40. **[feature] M: Cheat Engine dissector follow-ups.** Symbol lookup callback (`global.gold`) and
     array element expansion (`RE/TODO.md`).
 41. ~~**[test] S: RunnerCompiler spike live run.**~~ Done: live capture (Done 2026-11-13,

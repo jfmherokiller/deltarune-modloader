@@ -24,6 +24,10 @@
 // point. Redirects and log_scripts start from ModuleInitialize, once YYToolkit is up; the
 // script hooks themselves are set up on the game thread (first EVENT_OBJECT_CALL), because
 // ModuleInitialize runs on Aurie's thread while the game is already running.
+//
+// log_scripts=1|2 logs the first run of each code entry (Code_Execute) and of each script
+// (gm::Observe(""), VM runners only), tagged with the loose mod(s) that provide it; 2 = mod
+// code only.
 #include <YYToolkit/YYTK_Shared.hpp>
 #include <script_hooks.hpp>
 #include <append_log.hpp>
@@ -34,6 +38,7 @@
 #include <cstring>
 #include <cwchar>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -72,7 +77,10 @@ namespace
 	int g_ModCount = 0;
 	std::vector<Redirect> g_EventRedirects;   // gml_Object_* and other Code_Execute code
 	std::vector<Redirect> g_ScriptRedirects;  // gml_Script_*
-	int g_LogFiles = 1, g_LogScripts = 0;
+	int g_LogFiles = 1;
+	// log_scripts: 0 off; 1 = first run of every code entry and script; 2 = only those a loose
+	// mod provides (see g_ModCode). Each line names the providing mod(s) when there are any.
+	int g_LogScripts = 0;
 	modloader::AppendLog g_Log;
 	CCode** g_CCodeListHead = nullptr;
 	bool g_Enabled = false;
@@ -320,6 +328,71 @@ namespace
 		return count;
 	}
 
+	// ------------------------------------------------------------------ log_scripts attribution
+	// Code entry / script name -> providing mod(s), from the loose-GML folders used for this
+	// process's data.win: file stems in code\ (gml_GlobalScript_X also gives gml_Script_X) and
+	// every "function name(" line in a .gml file (a global script can declare several).
+	// Built only when log_scripts is on, before the game runs any code; read on the game thread.
+	std::unordered_map<std::string, std::string> g_ModCode;
+
+	void AddModCode(const std::string& name, const std::string& mod)
+	{
+		std::string& v = g_ModCode[name];
+		if (v.empty()) v = mod;
+		else if (("+" + v + "+").find("+" + mod + "+") == std::string::npos) v += "+" + mod;   // several mods
+	}
+
+	void ScanGmlFunctions(const WCHAR* file, const std::string& mod)
+	{
+		FILE* f = _wfopen(file, L"rb");
+		if (!f) return;
+		char line[1024];
+		while (fgets(line, sizeof line, f)) {
+			const char* p = line;
+			while (*p == ' ' || *p == '	') p++;
+			if (strncmp(p, "function", 8) != 0 || (p[8] != ' ' && p[8] != '	')) continue;
+			p += 9;
+			while (*p == ' ' || *p == '	') p++;
+			const char* e = p;
+			while ((*e >= 'a' && *e <= 'z') || (*e >= 'A' && *e <= 'Z') || (*e >= '0' && *e <= '9') || *e == '_') e++;
+			if (e > p) AddModCode("gml_Script_" + std::string(p, e - p), mod);
+		}
+		fclose(f);
+	}
+
+	void BuildModCodeMap(const WCHAR* dirs)
+	{
+		size_t modsLen = wcslen(g_ModsDir);
+		for (const std::wstring& dir : SplitDirs(dirs)) {
+			if (dir.size() <= modsLen + 1) continue;
+			std::wstring modW = dir.substr(modsLen + 1);   // <Mod>\<sub>
+			modW = modW.substr(0, modW.find(L'\\'));
+			char mod[MAX_PATH * 3]; W2U(modW.c_str(), mod, sizeof mod);
+			WCHAR pat[MAX_PATH * 2];
+			_snwprintf(pat, MAX_PATH * 2, L"%s\\code\\*", dir.c_str());
+			WIN32_FIND_DATAW fd;
+			HANDLE h = FindFirstFileW(pat, &fd);
+			if (h == INVALID_HANDLE_VALUE) continue;
+			do {
+				if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+				const WCHAR* ext = wcsrchr(fd.cFileName, L'.');
+				if (!ext || (_wcsicmp(ext, L".gml") && _wcsicmp(ext, L".patch") && _wcsicmp(ext, L".diff"))) continue;
+				char stem[MAX_PATH * 3]; W2U(fd.cFileName, stem, sizeof stem);
+				std::string name(stem, strlen(stem) - wcslen(ext));
+				AddModCode(name, mod);
+				if (name.rfind("gml_GlobalScript_", 0) == 0)
+					AddModCode("gml_Script_" + name.substr(17), mod);
+				if (!_wcsicmp(ext, L".gml")) {
+					WCHAR file[MAX_PATH * 2];
+					_snwprintf(file, MAX_PATH * 2, L"%s\\code\\%s", dir.c_str(), fd.cFileName);
+					ScanGmlFunctions(file, mod);
+				}
+			} while (FindNextFileW(h, &fd));
+			FindClose(h);
+		}
+		Log("log_scripts: %zu code entry/script name(s) attributed to loose mods", g_ModCode.size());
+	}
+
 	void* CompileLooseGml(const char* path_utf8, unsigned int* out_size)
 	{
 		static WCHAR wpath[MAX_PATH * 2], full[MAX_PATH * 2], rel_dir[MAX_PATH * 2], dirs[8192];
@@ -337,6 +410,7 @@ namespace
 
 		int mods = CollectGmlDirs(rel_dir, dirs, sizeof dirs / sizeof dirs[0]);
 		if (!mods) return nullptr;
+		if (g_LogScripts) { g_ModCode.clear(); BuildModCodeMap(dirs); }
 		static char dirs_u[16384];
 		W2U(dirs, dirs_u, sizeof dirs_u);
 		if (GetFileAttributesW(g_UtmtCli) == INVALID_FILE_ATTRIBUTES || GetFileAttributesW(g_ImportScript) == INVALID_FILE_ATTRIBUTES) {
@@ -452,31 +526,58 @@ namespace
 		return nullptr;
 	}
 
-	std::unordered_set<CCode*> g_Seen;   // game thread only
+	// log_scripts: first run of each code entry (Code_Execute: object events, global script
+	// bodies) and of each script (gm::Observe(""): script calls, VM runners only). The seen sets
+	// are game thread only; after its first run a script costs one hash lookup per call.
+	constexpr size_t MAX_LOGGED = 16384;
+	std::unordered_set<CCode*> g_Seen;
+	std::unordered_set<CScript*> g_SeenScripts;
 
-	// Script redirects go through script_hooks.hpp, which must be set up on the game thread.
-	void InstallScriptRedirects()
+	void LogFirstRun(const char* kind, const char* name)
+	{
+		auto it = name ? g_ModCode.find(name) : g_ModCode.end();
+		if (it != g_ModCode.end())
+			Log("%s first run: %s [mod: %s]", kind, name, it->second.c_str());
+		else if (g_LogScripts == 1)
+			Log("%s first run: %s", kind, name ? name : "(null)");
+	}
+
+	void ScriptCallObserver(const gm::CallInfo& call, void*)
+	{
+		if (g_SeenScripts.size() < MAX_LOGGED && g_SeenScripts.insert(call.script).second)
+			LogFirstRun("script", call.name);
+	}
+
+	// Script redirects and the log_scripts observer go through script_hooks.hpp, which must be
+	// set up on the game thread.
+	void InstallScriptHooks()
 	{
 		AurieStatus s = gm::Init(g_Module, GetInterface());
 		Log("script hooks: %s", AurieStatusToString(s));
 		for (const Redirect& r : g_ScriptRedirects)
 			Log("script redirect %s -> %s: %s", r.target.c_str(), r.substitute.c_str(),
 				AurieSuccess(s) ? AurieStatusToString(gm::Redirect(r.target, r.substitute)) : "skipped");
+		if (g_LogScripts) {
+			AurieStatus o = AurieSuccess(s) ? gm::Observe("", ScriptCallObserver) : s;
+			Log("log_scripts: script calls %s", AurieSuccess(o) ? "observed through gm::Observe" :
+				o == AURIE_NOT_IMPLEMENTED ? "not observable on YYC; only Code_Execute code is logged" :
+				AurieStatusToString(o));
+		}
 	}
 
-	bool g_ScriptRedirectsDone = false;
+	bool g_ScriptHooksDone = false;
 
 	void CodeCallback(FWCodeEvent& event)
 	{
-		if (!g_ScriptRedirectsDone) {
-			g_ScriptRedirectsDone = true;
-			if (!g_ScriptRedirects.empty())
-				InstallScriptRedirects();
+		if (!g_ScriptHooksDone) {
+			g_ScriptHooksDone = true;
+			if (!g_ScriptRedirects.empty() || g_LogScripts)
+				InstallScriptHooks();
 		}
 		auto& [self, other, code, result, argc] = event.Arguments();
 		if (!code) return;
-		if (g_LogScripts && g_Seen.size() < 16384 && g_Seen.insert(code).second)
-			Log("script first run: %s", code->m_Name ? code->m_Name : "(null)");
+		if (g_LogScripts && g_Seen.size() < MAX_LOGGED && g_Seen.insert(code).second)
+			LogFirstRun("code", code->m_Name);
 		for (Redirect& r : g_EventRedirects) {
 			if (r.targetCode ? code != r.targetCode : (!code->m_Name || r.target != code->m_Name))
 				continue;

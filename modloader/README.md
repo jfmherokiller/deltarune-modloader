@@ -81,7 +81,7 @@ bootstrap=native\AurieCore.dll    ; what the proxy loads, relative to mods\
 aurie_timeout_ms=30000            ; resume the game ourselves if Aurie has not
 aurie_console=0                   ; 1 = keep Aurie's console window
 log_files=0                       ; LooseMods: 1 = log every file read (research)
-log_scripts=0                     ; LooseMods: 1 = log each object event / global script the first time it runs
+log_scripts=0                     ; LooseMods: 1 = log each code entry / script the first time it runs, 2 = only mod code (see "Checking that your code runs")
 ;utmt_cli=                        ; LooseMods: loose GML compiler override
 gml_timeout_ms=300000             ; LooseMods: compiler timeout
 gml_cache=1                       ; LooseMods: 0 = always recompile loose GML (env DR_GML_CACHE overrides)
@@ -202,6 +202,29 @@ mods (e.g. CheatMenu's `obj_time_Step_1` append) stack on the same scripts.
 **Converting an xdelta mod:** `python tools/xdelta_to_gml.py <game> <ModName>
 chapter2_windows=patch.xdelta ...` keeps only the code entries the patch changed and
 warns about asset differences (export those with UTMT into `sprites\`/`sounds\`).
+
+### Checking that your code runs (`log_scripts`)
+
+Set `log_scripts=2` in `mods\modloader.ini` and `mods\modloader.log` gets one line the first
+time each piece of your mod's code runs, tagged with the mod that provides it:
+
+```
+[loosemods] code first run: gml_Object_obj_ui_version_Draw_0 [mod: LogTest]
+[loosemods] script first run: gml_Script_lstest_hello [mod: LogTest]
+```
+
+- `code` lines are object events and `gml_GlobalScript_*` bodies (YYToolkit's `Code_Execute`
+  hook). `script` lines are function calls, including script-to-script calls (`gm::Observe("")`
+  in `yyc_interop/include/script_hooks.hpp`; VM runners such as DELTARUNE only).
+- Attribution comes from your `code\` file names (`gml_GlobalScript_X` also covers
+  `gml_Script_X`) and from every `function name(` line in your `.gml` files. Names that more
+  than one mod touches show as `[mod: A+B]`. There is no line number: the hooks see calls, not
+  source lines.
+- `log_scripts=1` logs every first run, vanilla included (untagged); `0` (default) installs no
+  hooks at all.
+- Only the first run is logged; the code that runs before YYToolkit is up (global script bodies
+  at startup) is not seen. To print values, use `show_debug_message` as usual: its output goes
+  to the game's own debug output, not to `modloader.log`.
 
 ## Bootstrap proxy and Aurie
 

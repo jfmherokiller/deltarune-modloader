@@ -18,7 +18,7 @@ It installs as `mods\aurie\LooseMods.dll` and reads `[loader]` in `mods\modloade
 | `ReadEntireFile` hook (file overrides, loose GML) | `ModulePreinitialize` | Aurie runs it while the main thread is still parked at the entry point, so the hook exists before the game reads `data.win` |
 | Wine `CreateProcessW` fix | `ModulePreinitialize` | Same early point |
 | `EVENT_OBJECT_CALL` callback (event redirects, `log_scripts`) | `ModuleInitialize` | YYToolkit is fully up by then |
-| Script redirects | first object event | `script_hooks.hpp` must be set up on the game thread. `ModuleInitialize` runs on Aurie's thread while the game is already running; calling it from there hung the game's module initialization |
+| Script redirects, `log_scripts` script observer | first object event | `script_hooks.hpp` must be set up on the game thread. `ModuleInitialize` runs on Aurie's thread while the game is already running; calling it from there hung the game's module initialization |
 
 Hooks use Aurie's `MmCreateHook`. Event redirects and script logging reuse YYToolkit's `Code_Execute` hook instead of hooking it a second time.
 
@@ -40,6 +40,21 @@ with a plain-text `manifest.txt` key (mod file hashes, mod order, vanilla `data.
 this DLL). An unchanged key skips the compiler; a miss logs the first key line that changed and
 rewrites the cache from a background thread. `gml_cache=0` / `DR_GML_CACHE=0` bypasses it. The
 XXH64 used for the key and the integrity check is `modloader/include/xxh64.hpp`.
+
+## `log_scripts`
+
+`log_scripts=1` logs the first run of every code entry (from `EVENT_OBJECT_CALL`) and every
+script (one `gm::Observe("")` observer on the shared hook, VM only; on YYC the log says script
+calls are not observable). `log_scripts=2` logs only names a loose mod provides. Lines are
+tagged `[mod: <Mod>]` from a name map built when the data.win is patched (code file stems plus
+`function name(` lines; also on a cache hit). After a script's first run the observer costs
+one pointer-set lookup per call; with `log_scripts=0` no callback or script hook is installed.
+Mod-author documentation: "Checking that your code runs" in `modloader/README.md`.
+
+Verified 2026-11-17 on the launcher under Proton with a test mod (Draw event calling two new
+functions): level 2 logged exactly the event and both functions, tagged with the mod; level 1
+also logged 16 vanilla code entries and 9 vanilla scripts; level 0 logged nothing and installed
+no hooks. Attribution also worked on a compile-cache hit.
 
 ## Logging
 
