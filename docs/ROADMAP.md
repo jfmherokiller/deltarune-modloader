@@ -308,6 +308,24 @@ locations and code-entry evidence for each one.
       `mods/config/DialogueBacklog.ini`, migrating the old files from the save folder once).
     Cards: research t_36d7f648 -> implementation t_bd9dfca1 -> DialogueBacklog port t_33d3cfc6
     (all parked; start manually).
+    **Research done (2026-11-17), decision in `docs/mod_storage.md`.** It was static analysis of
+    both runners; the live test is in t_bd9dfca1.
+    - **Module:** ModHost owns it all: path rules (`Storage`), built-ins and the sandbox detour.
+    - **Registering the built-ins:** found by string, not address. A detour on
+      `Register_AllBuiltinFunctions`, installed in `ModulePreinitialize`, calls `Function_Add`
+      after the original returns. That is before the `FUNC` chunk is resolved. Calling it earlier
+      breaks DEM's hash map; calling it later breaks data.win bytecode.
+    - **GML functions:** `modloader_config_path`, `modloader_data_dir`, `modloader_log_dir`. Each
+      returns an absolute path, or `""` as the save-area fallback.
+    - **Sandbox:** GML cannot write into the game folder on either runner. DELTARUNE rewrites
+      game-folder paths into `%LOCALAPPDATA%` even though its `DisableSandbox` bit is set; DEM's
+      sandbox is on. Decided fix: one detour on the save-path mapper that passes
+      `mods\config\` and `mods\data\` through unchanged, instead of native write helpers.
+    - **Compiler:** declares the three names in UTMT's `BuiltinList`.
+    - **Native plugins:** `PluginInfo.configPath` moves to `mods\config\<id>.ini`, migrated
+      once; a new `dataDir` field and `GetConfigPath`/`GetDataDir` methods are appended.
+    - **YYToolkit:** an `AddBuiltinFunction` goes to the fork only after the ModHost version is
+      verified in game.
 48. **[idea] M (optional, later): DialogueBacklog character portraits** next to speaker names.
 
 ## What goes upstream (proposed policy)
