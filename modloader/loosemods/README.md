@@ -3,6 +3,7 @@
 LooseMods is the Aurie module behind the loose-mod features in `modloader/README.md`:
 - file overrides;
 - loose GML, sprites and sounds;
+- streamed music overrides (`mods\<Mod>\mus\`);
 - `redirects.txt`;
 - `log_files` / `log_scripts`;
 - the Wine chapter-relaunch fix.
@@ -19,6 +20,7 @@ It installs as `mods\aurie\LooseMods.dll` and reads `[loader]` in `mods\modloade
 | Wine `CreateProcessW` fix | `ModulePreinitialize` | Same early point |
 | `EVENT_OBJECT_CALL` callback (event redirects, `log_scripts`) | `ModuleInitialize` | YYToolkit is fully up by then |
 | Script redirects, `log_scripts` script observer | first object event | `script_hooks.hpp` must be set up on the game thread. `ModuleInitialize` runs on Aurie's thread while the game is already running; calling it from there hung the game's module initialization |
+| `audio_create_stream` hook (streamed music overrides) | first object event | Only when a mod ships a valid `mus\*.ogg`; before any GML has opened a stream |
 
 Hooks use Aurie's `MmCreateHook`. Event redirects and script logging reuse YYToolkit's `Code_Execute` hook instead of hooking it a second time.
 
@@ -55,6 +57,24 @@ Verified 2026-11-17 on the launcher under Proton with a test mod (Draw event cal
 functions): level 2 logged exactly the event and both functions, tagged with the mod; level 1
 also logged 16 vanilla code entries and 9 vanilla scripts; level 0 logged nothing and installed
 no hooks. Attribution also worked on a compile-cache hit.
+
+## Streamed music (`mus\`)
+
+`ScanStreamOverrides` runs once in `ModulePreinitialize`: it collects `mods\<Mod>\mus\*.ogg` in load
+order, drops (with a `WARN`) files whose `<game>\mus\<file>` doesn't exist, that aren't readable
+`OggS` data, or `.ogg` files placed next to a mod's `data.win` path, and keeps the last mod per
+track. If anything is left, the first object event hooks the `audio_create_stream` built-in
+(`GetNamedRoutinePointer`, so VM and YYC alike) and swaps argument 0 for the winning file when
+the full path resolves to `<game>\mus\<file>`. Streamed `SOND` entries next to `data.win` go
+through `sounds\` and `ImportLooseMod.csx` instead (embedded at load time).
+
+Verified 2026-11-17 on chapter 5 under Proton (headless gamescope, audio on a null sink): two
+mods each shipping a sine `mus\quiet_church.ogg` (440 / 880 Hz) logged the conflict, the hook
+opened the later mod's file (`-> 300000`) and the recording held a steady ~836 Hz tone (880 Hz at
+the game's 0.95 pitch); with both mods removed no hook was installed, the original music played
+and `mus\` hashes were unchanged. The runner's own file check depends on the current directory:
+a chapter started directly from the game root gets `-1` from `audio_create_stream` for every
+track, vanilla or not; the launcher starts chapters in their own folder, which works.
 
 ## Logging
 

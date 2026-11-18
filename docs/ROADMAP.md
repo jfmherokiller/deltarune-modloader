@@ -258,8 +258,13 @@ locations and code-entry evidence for each one.
 35. ~~**[feature] S: cache the loose-GML compile.**~~ Done (2026-11-14): `mods\cache\loosegml\`,
     keyed on mod file contents, mod order, vanilla `data.win`, compiler and LooseMods build
     (`modloader/loosemods/source/GmlCache.hpp`). Ch5 with three mods: 2.8–4.9 s compile → ~0.1 s.
-36. **[feature] M: streamed `.ogg` overrides.** Music beside `data.win` and in `mus\` is opened by
-    the audio engine, not `ReadEntireFile`.
+36. ~~**[feature] M: streamed `.ogg` overrides.**~~ Done (2026-11-17): `mods\<Mod>\mus\<file>.ogg`
+    replaces `mus\<file>.ogg` at run time (LooseMods hooks `audio_create_stream` and swaps the
+    path; nothing is copied). Streamed `SOND` entries next to `data.win` are replaced by sound
+    name through `sounds\<name>.ogg` and embedded. Later mod wins, conflicts/overrides/bad
+    targets logged. Verified on chapter 5 under Proton by recording the replacement tone;
+    test `compiler/tests/test_loose_sounds.py`. Docs: "Streamed music and sounds" in
+    `modloader/README.md`.
 37. **[feature] S: sprite size-change behaviour.** Decide the resize/origin rules for frames whose
     size differs from the original.
 38. **[test] S: Windows builds and the release workflow.** Not run since the thin-proxy change:

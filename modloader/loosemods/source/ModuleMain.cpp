@@ -14,7 +14,12 @@
 //      - object events (gml_Object_*) through YYToolkit's EVENT_OBJECT_CALL;
 //      - scripts (gml_Script_*) through script_hooks.hpp (gm::Redirect), which also sees
 //        script-to-script calls (they never pass through Code_Execute).
-//   4. Wine only: rewrites the chapter self-relaunch command line to an absolute data.win path
+//   4. Streamed music (mods\<ModName>\mus\<file>.ogg): the game streams mus\*.ogg through the
+//      audio_create_stream built-in, never ReadEntireFile. Overrides are validated and resolved
+//      (later mod wins) once at start; a hook on that built-in swaps the path argument for the
+//      winning mod's file. Nothing is copied or written. Streamed SOND entries (the .ogg next to
+//      a data.win) are replaced by name through sounds\<name>.ogg instead (ImportLooseMod.csx).
+//   5. Wine only: rewrites the chapter self-relaunch command line to an absolute data.win path
 //      (Wine does not apply lpCurrentDirectory before resolving it).
 //
 // Items 1 and 2 hook fixed addresses of the current DELTARUNE build, each checked against a
@@ -517,6 +522,178 @@ namespace
 		return buf;
 	}
 
+	// ------------------------------------------------------------------ streamed audio overrides
+	// DELTARUNE streams its music with audio_create_stream("mus/<file>.ogg") (snd_init; the
+	// launcher passes working_directory + "../mus/<file>.ogg"). Those files have no SOND entry and
+	// the audio engine opens them itself, so they can't be served through ReadEntireFile.
+	// mods\<Mod>\mus\<file>.ogg overrides <game>\mus\<file>.ogg: validated once at start (the target
+	// must exist in the game, the file must be readable Ogg data), the last mod in the load order
+	// wins, and the hook below swaps the path argument. The game folder is never written to.
+	struct StreamOverride { std::wstring file; std::string mod; };
+	std::unordered_map<std::wstring, StreamOverride> g_StreamOverrides;   // key: lower-case "mus\<file>"
+	TRoutine g_OrigAudioCreateStream = nullptr;
+	bool g_StreamHookTried = false;
+
+	std::wstring Lower(std::wstring s)
+	{
+		if (!s.empty()) CharLowerBuffW(&s[0], (DWORD)s.size());
+		return s;
+	}
+
+	// "" when readable Ogg data, else why not.
+	const char* CheckOgg(const WCHAR* path)
+	{
+		HANDLE h = CreateFileW(path, GENERIC_READ, FILE_SHARE_READ, nullptr, OPEN_EXISTING, 0, nullptr);
+		if (h == INVALID_HANDLE_VALUE) return "can't be opened";
+		char magic[4] = {};
+		DWORD n = 0;
+		BOOL ok = ReadFile(h, magic, 4, &n, nullptr);
+		CloseHandle(h);
+		if (!ok) return "can't be read";
+		if (n != 4 || memcmp(magic, "OggS", 4) != 0) return "is not Ogg Vorbis data";
+		return "";
+	}
+
+	// Warns about .ogg files a mod put next to a data.win (mods\<Mod>\<chapter>\x.ogg): the runner
+	// opens the streamed SOND files there itself, so a same-path file override does nothing.
+	void WarnMisplacedOgg(int mod, const WCHAR* sub, const char* modU)
+	{
+		WCHAR pat[MAX_PATH * 2];
+		_snwprintf(pat, MAX_PATH * 2, L"%s\\%s\\%s%s*.ogg", g_ModsDir, g_ModNames[mod], sub, sub[0] ? L"\\" : L"");
+		WIN32_FIND_DATAW fd;
+		HANDLE h = FindFirstFileW(pat, &fd);
+		if (h == INVALID_HANDLE_VALUE) return;
+		do {
+			if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+			char f[MAX_PATH * 3], d[MAX_PATH * 3]; W2U(fd.cFileName, f, sizeof f); W2U(sub, d, sizeof d);
+			const char* dot = strrchr(f, '.'); if (dot) f[dot - f] = 0;
+			Log("WARN stream override: %s\\%s%s%s.ogg (mod %s) is ignored: a streamed sound next to data.win is "
+				"replaced by name with %s%ssounds\\%s.ogg", modU, d, d[0] ? "\\" : "", f, modU, d, d[0] ? "\\" : "", f);
+		} while (FindNextFileW(h, &fd));
+		FindClose(h);
+	}
+
+	void ScanStreamOverrides()
+	{
+		std::unordered_map<std::wstring, std::vector<std::string>> providers;
+		int bad = 0;
+		for (int i = 0; i < g_ModCount; i++) {
+			char modU[MAX_PATH * 3]; W2U(g_ModNames[i], modU, sizeof modU);
+			// Misplaced files: mod root (launcher), all_chapters, chapterN_windows.
+			WarnMisplacedOgg(i, L"", modU);
+			{
+				WCHAR pat[MAX_PATH * 2];
+				_snwprintf(pat, MAX_PATH * 2, L"%s\\%s\\*", g_ModsDir, g_ModNames[i]);
+				WIN32_FIND_DATAW fd;
+				HANDLE h = FindFirstFileW(pat, &fd);
+				if (h != INVALID_HANDLE_VALUE) {
+					do {
+						if ((fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) &&
+							(_wcsnicmp(fd.cFileName, L"chapter", 7) == 0 || !_wcsicmp(fd.cFileName, L"all_chapters")))
+							WarnMisplacedOgg(i, fd.cFileName, modU);
+					} while (FindNextFileW(h, &fd));
+					FindClose(h);
+				}
+			}
+			WCHAR pat[MAX_PATH * 2];
+			_snwprintf(pat, MAX_PATH * 2, L"%s\\%s\\mus\\*", g_ModsDir, g_ModNames[i]);
+			WIN32_FIND_DATAW fd;
+			HANDLE h = FindFirstFileW(pat, &fd);
+			if (h == INVALID_HANDLE_VALUE) continue;
+			do {
+				if (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) continue;
+				char f[MAX_PATH * 3]; W2U(fd.cFileName, f, sizeof f);
+				const WCHAR* ext = wcsrchr(fd.cFileName, L'.');
+				if (!ext || _wcsicmp(ext, L".ogg")) {
+					Log("WARN stream override: %s\\mus\\%s (mod %s) is not an .ogg file; skipped", modU, f, modU);
+					bad++;
+					continue;
+				}
+				WCHAR cand[MAX_PATH * 2], vanilla[MAX_PATH * 2];
+				_snwprintf(cand, MAX_PATH * 2, L"%s\\%s\\mus\\%s", g_ModsDir, g_ModNames[i], fd.cFileName);
+				_snwprintf(vanilla, MAX_PATH * 2, L"%s\\mus\\%s", g_GameRoot, fd.cFileName);
+				DWORD va = GetFileAttributesW(vanilla);
+				if (va == INVALID_FILE_ATTRIBUTES || (va & FILE_ATTRIBUTE_DIRECTORY)) {
+					Log("WARN stream override: %s\\mus\\%s (mod %s) matches no streamed track (the game has no mus\\%s); skipped",
+						modU, f, modU, f);
+					bad++;
+					continue;
+				}
+				const char* why = CheckOgg(cand);
+				if (why[0]) {
+					Log("WARN stream override: %s\\mus\\%s (mod %s) %s; skipped", modU, f, modU, why);
+					bad++;
+					continue;
+				}
+				std::wstring key = Lower(std::wstring(L"mus\\") + fd.cFileName);
+				g_StreamOverrides[key] = { cand, modU };   // later mod wins
+				providers[key].push_back(modU);
+			} while (FindNextFileW(h, &fd));
+			FindClose(h);
+		}
+		for (auto& [key, mods] : providers) {
+			const StreamOverride& o = g_StreamOverrides[key];
+			char k[MAX_PATH * 3], file[MAX_PATH * 6]; W2U(key.c_str(), k, sizeof k); W2U(o.file.c_str(), file, sizeof file);
+			if (mods.size() > 1) {
+				std::string list;
+				for (auto& m : mods) list += (list.empty() ? "" : ", ") + m;
+				Log("stream override conflict: %s provided by %s; %s wins (load order)", k, list.c_str(), o.mod.c_str());
+			}
+			Log("stream override: %s <- %s (mod %s)", k, file, o.mod.c_str());
+		}
+		if (!g_StreamOverrides.empty() || bad)
+			Log("stream overrides: %zu track(s) replaced, %d file(s) skipped", g_StreamOverrides.size(), bad);
+	}
+
+	// Maps a path handed to audio_create_stream to an override, or nullptr. Relative paths are
+	// resolved like the runner does (current directory = game folder).
+	const StreamOverride* FindStreamOverride(const char* path_utf8)
+	{
+		WCHAR wpath[MAX_PATH * 2], full[MAX_PATH * 2];
+		if (!path_utf8 || !MultiByteToWideChar(CP_UTF8, 0, path_utf8, -1, wpath, MAX_PATH * 2)) return nullptr;
+		DWORD n = GetFullPathNameW(wpath, MAX_PATH * 2, full, nullptr);
+		if (!n || n >= MAX_PATH * 2) return nullptr;
+		for (WCHAR* p = full; *p; p++) if (*p == L'/') *p = L'\\';
+		if (_wcsnicmp(full, g_GameRoot, g_GameRootLen) != 0 || full[g_GameRootLen] != L'\\') return nullptr;
+		auto it = g_StreamOverrides.find(Lower(full + g_GameRootLen + 1));
+		return it == g_StreamOverrides.end() ? nullptr : &it->second;
+	}
+
+	void HookedAudioCreateStream(RValue& result, CInstance* self, CInstance* other, int argc, RValue* args)
+	{
+		const StreamOverride* o = nullptr;
+		std::string orig;
+		if (argc >= 1 && args && args[0].m_Kind == VALUE_STRING) {
+			orig = args[0].ToString();
+			o = FindStreamOverride(orig.c_str());
+		}
+		if (!o) {
+			g_OrigAudioCreateStream(result, self, other, argc, args);
+			if (g_LogFiles) Log("stream \"%s\" -> %s", orig.c_str(), result.ToString().c_str());
+			return;
+		}
+		char file[MAX_PATH * 6]; W2U(o->file.c_str(), file, sizeof file);
+		RValue saved = args[0];
+		args[0] = RValue(std::string_view(file));
+		g_OrigAudioCreateStream(result, self, other, argc, args);
+		args[0] = saved;
+		Log("STREAM OVERRIDE \"%s\" => \"%s\" (mod %s) -> %s", orig.c_str(), file, o->mod.c_str(),
+			result.ToString().c_str());
+	}
+
+	// Game thread, first code event: before any GML has called audio_create_stream.
+	void InstallStreamHook()
+	{
+		g_StreamHookTried = true;
+		PVOID target = nullptr, trampoline = nullptr;
+		AurieStatus s = GetInterface()->GetNamedRoutinePointer("audio_create_stream", &target);
+		if (AurieSuccess(s))
+			s = MmCreateHook(g_Module, "audio_create_stream", target, reinterpret_cast<PVOID>(&HookedAudioCreateStream), &trampoline);
+		g_OrigAudioCreateStream = reinterpret_cast<TRoutine>(trampoline);
+		Log("hook audio_create_stream @ %p (%zu stream override(s)): %s", target, g_StreamOverrides.size(),
+			AurieStatusToString(s));
+	}
+
 	// ------------------------------------------------------------------ redirects + script log (YYToolkit)
 	CCode* FindCCodeByName(const char* name)
 	{
@@ -573,6 +750,8 @@ namespace
 			g_ScriptHooksDone = true;
 			if (!g_ScriptRedirects.empty() || g_LogScripts)
 				InstallScriptHooks();
+			if (!g_StreamOverrides.empty() && !g_StreamHookTried)
+				InstallStreamHook();
 		}
 		auto& [self, other, code, result, argc] = event.Arguments();
 		if (!code) return;
@@ -690,6 +869,7 @@ EXPORTED AurieStatus ModulePreinitialize(IN AurieModule* Module, IN const fs::pa
 		_snwprintf(g_ImportScript, MAX_PATH * 2, L"%s\\tools\\ImportGMLFolder.csx", g_ModsDir);
 
 	ScanMods();
+	ScanStreamOverrides();
 	g_Enabled = true;
 
 	char* base = (char*)GetModuleHandleW(nullptr);
@@ -718,14 +898,14 @@ EXPORTED AurieStatus ModuleInitialize(IN AurieModule* Module, IN const fs::path&
 		return AURIE_SUCCESS;
 	YYTKInterface* yytk = GetInterface();
 	if (!yytk) {
-		Log("YYToolkit not loaded: redirects.txt and log_scripts are off");
+		Log("YYToolkit not loaded: redirects.txt, log_scripts and stream overrides are off");
 		return AURIE_SUCCESS;
 	}
-	if (!g_EventRedirects.empty() || !g_ScriptRedirects.empty() || g_LogScripts) {
+	if (!g_EventRedirects.empty() || !g_ScriptRedirects.empty() || g_LogScripts || !g_StreamOverrides.empty()) {
 		if (!g_EventRedirects.empty() && !g_CCodeListHead)
 			Log("event redirects need the DELTARUNE code list; they are off in this exe");
 		AurieStatus s = yytk->CreateCallback(Module, EVENT_OBJECT_CALL, CodeCallback, 0);
-		Log("EVENT_OBJECT_CALL callback (redirects, log_scripts): %s", AurieStatusToString(s));
+		Log("EVENT_OBJECT_CALL callback (redirects, log_scripts, stream overrides): %s", AurieStatusToString(s));
 	}
 	return AURIE_SUCCESS;
 }

@@ -63,7 +63,8 @@ DELTARUNE\
   the install folder can be replaced by the same relative path under
   `mods\<Mod>\`. The last mod in the load order wins. This covers
   each chapter's `data.win`, `lang\*.json`, `options.ini`, and `audiogroup*.dat`.
-  Loose `.ogg` music/SFX is **not** covered yet, because it's streamed by another reader.
+  Streamed `.ogg` audio is opened by the audio engine, not `ReadEntireFile`; it has its own
+  override path, see "Streamed music and sounds" below.
 * **Script redirects** (`redirects.txt`): `target = substitute`, one per line, `#` comments.
   When the game runs `target`, it runs the already-compiled `substitute` instead. Both must
   exist in the running chapter's data.win. Names are the `code/` dump names.
@@ -97,6 +98,7 @@ mods\<Mod>\chapter2_windows\sprites\spr_mything.origin.txt            "x y" orig
 mods\<Mod>\chapter2_windows\sounds\snd_menumove.ogg                   replace a sound (.ogg or .wav)
 mods\<Mod>\chapter2_windows\sounds\snd_mynew.ogg                      new sound, usable as snd_mynew in GML
 mods\<Mod>\code\... sprites\... sounds\...                            launcher (root data.win)
+mods\<Mod>\mus\legend_altered.ogg                                     replace streamed music (see below)
 ```
 
 `mods\<Mod>\all_chapters\` has the same layout and is applied to every `chapterN_windows`
@@ -183,8 +185,35 @@ size of its `data.win`.
   resizes the sprite. Precise collision masks are regenerated only for sprites that
   already had one.
 - Sounds are embedded in `data.win` (default audio group) and play through the normal
-  `snd_play`. Streamed music (the `.ogg` files next to `data.win` and in `mus\`) is
-  opened by the audio engine, not `ReadEntireFile`, so it can't be overridden yet.
+  `snd_play`. This also works for *streamed* sounds (see below).
+
+### Streamed music and sounds
+
+DELTARUNE streams audio from two places, and each has its own override:
+
+| Original | Override with | How |
+|---|---|---|
+| `mus\<file>.ogg` (the music; no sound entry in `data.win`, played with `audio_create_stream`) | `mods\<Mod>\mus\<file>.ogg` (same file name) | At run time: LooseMods swaps the path the game passes to `audio_create_stream` for the mod's file |
+| `chapterN_windows\<name>.ogg` next to `data.win` (a streamed sound entry: `SOND` flags without `IsEmbedded`/`IsCompressed`, the file name in its `File` field) | `mods\<Mod>\chapterN_windows\sounds\<name>.ogg` (the **sound name**, like any other sound) | At load time: the replacement is embedded into the patched `data.win` and the entry becomes an embedded Ogg |
+
+- Nothing in the game folder is written or copied: `mus\` and the `.ogg` files next to
+  `data.win` stay untouched, and removing the mod (or prefixing it with `_`) restores the
+  original on the next launch. With no `mus\` overrides installed the hook isn't installed.
+- A later mod in the load order wins. A conflict is logged with the winner:
+  `stream override conflict: mus\legend_altered.ogg provided by ModA, ModB; ModB wins (load order)`
+  (`[DR] sound <name>: provided by ModA, ModB; ModB wins (load order)` for `sounds\`).
+- Every applied override is logged with its mod and file (`stream override: mus\x.ogg <- <path>
+  (mod M)` at start, then `STREAM OVERRIDE "..." => "..." (mod M)` each time the track is opened;
+  `[DR] sound <name> (M): streamed sound (was <name>.ogg next to data.win ...) <- <path>` in
+  `modloader.gml.log`).
+- Bad files are skipped with a `WARN` naming the mod and file, never a crash: a `mus\` file the
+  game doesn't have, a file that isn't Ogg data or can't be read, and a sound name that doesn't
+  exist (*"did you mean …?"*; it would become an unused new sound).
+- **Original external file names are not a target.** An `.ogg` dropped next to a mod's
+  `data.win` path (`mods\<Mod>\chapterN_windows\<name>.ogg`, or the mod root / `all_chapters\`)
+  does nothing, because the runner opens those itself; the loader warns and names the
+  `sounds\<name>.ogg` path to use instead. Use the sound name (find it with UTMT, or the file
+  name without `.ogg`, which is the same for every streamed sound in DELTARUNE).
 
 Needs `mods\tools\utmt\` (UndertaleModTool CLI 0.9.2.0, `UTMT_CLI_*-Windows.zip`) and
 `mods\tools\ImportLooseMod.csx` (from `tools/`; `ImportGMLFolder.csx` is the older

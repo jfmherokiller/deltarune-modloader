@@ -10,7 +10,12 @@
 //   sprites\<sprite_name>_<frame>.png   replace a frame / add frames / create a new sprite
 //   sprites\<sprite_name>.origin.txt    optional "x y" origin for NEW sprites (default 0 0)
 //   sounds\<sound_name>.ogg|.wav        replace an existing sound or add a new one
-//                                       (embedded into data.win, default audio group)
+//                                       (embedded into data.win, default audio group).
+//                                       Also replaces streamed SOND entries (flags without
+//                                       IsEmbedded: the <name>.ogg next to data.win); the
+//                                       replacement is embedded, the file on disk is untouched.
+//                                       Streamed music in mus\ has no SOND entry: LooseMods
+//                                       redirects it at run time (mods\<Mod>\mus\<file>.ogg).
 //   code\<gml_CodeName>.gml             replace / create code (UTMT naming)
 // Sprites and sounds are imported first so GML can reference new asset names.
 // Order is deterministic: roots in DR_MOD_DIRS order (the loader's load order: load_order.txt,
@@ -41,6 +46,7 @@ var frameRx = new Regex(@"^(.+?)_(\d+)$");
 var spriteFrames = new Dictionary<string, SortedDictionary<int, string>>(StringComparer.Ordinal);
 var spriteOrigins = new Dictionary<string, (int, int)>(StringComparer.Ordinal);
 var sounds = new Dictionary<string, string>(StringComparer.Ordinal);
+var soundProviders = new Dictionary<string, List<string>>(StringComparer.Ordinal);   // name -> files, load order
 var gml = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 var patchFiles = new List<string>();
 foreach (string root in roots)
@@ -66,7 +72,12 @@ foreach (string root in roots)
     if (Directory.Exists(snd))
         foreach (string f in Directory.GetFiles(snd).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
             if (f.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
-                sounds[Path.GetFileNameWithoutExtension(f)] = f;
+            {
+                string sn = Path.GetFileNameWithoutExtension(f);
+                sounds[sn] = f;                                      // later mod wins
+                if (!soundProviders.TryGetValue(sn, out var prov)) soundProviders[sn] = prov = new List<string>();
+                prov.Add(f);
+            }
     string cd = Path.Combine(root, "code");
     if (Directory.Exists(cd))
         foreach (string f in Directory.GetFiles(cd).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
@@ -145,9 +156,11 @@ foreach (string name in spriteFrames.Keys.ToList())
 
 string ModOf(string path)
 {
-    // mods\<Mod>\<chapter|all_chapters>\sprites\... -> <Mod>
+    // mods\<Mod>\<chapter|all_chapters>\sprites|sounds\... -> <Mod>; launcher: mods\<Mod>\sounds\...
     var parts = Path.GetFullPath(path).Split(Path.DirectorySeparatorChar);
-    int i = Array.FindLastIndex(parts, p => p.Equals("sprites", StringComparison.OrdinalIgnoreCase));
+    int i = Array.FindLastIndex(parts, p => p.Equals("sprites", StringComparison.OrdinalIgnoreCase)
+                                         || p.Equals("sounds", StringComparison.OrdinalIgnoreCase));
+    if (i >= 2 && parts[i - 2].Equals("mods", StringComparison.OrdinalIgnoreCase)) return parts[i - 1];
     return i >= 2 ? parts[i - 2] : path;
 }
 string NearestSprite(string name)
@@ -343,36 +356,83 @@ void ImportSprites()
 }
 
 // ---------------------------------------------------------------- sounds
+// Every applied override is logged with its mod and file; several mods on one name resolve by
+// load order (the last one wins, like full .gml replacements) and the conflict is logged. A file
+// that can't be read or isn't Ogg/RIFF data is skipped with a WARN instead of failing the build.
+foreach (var (name, prov) in soundProviders.OrderBy(k => k.Key, StringComparer.Ordinal))
+    if (prov.Select(ModOf).Distinct(StringComparer.OrdinalIgnoreCase).Count() > 1)
+        Console.WriteLine($"[DR] sound {name}: provided by {string.Join(", ", prov.Select(ModOf))}; " +
+                          $"{ModOf(prov[^1])} wins (load order)");
+int soundsDone = 0;
 if (sounds.Count > 0)
 {
     int builtin = Data.GetBuiltinSoundGroupID();
     var builtinGroup = Data.AudioGroups.Count > 0 ? Data.AudioGroups[builtin] : null;
     foreach (var (name, path) in sounds.OrderBy(k => k.Key, StringComparer.Ordinal))
     {
+        string from = ModOf(path);
         bool isOgg = path.EndsWith(".ogg", StringComparison.OrdinalIgnoreCase);
-        var audio = new UndertaleEmbeddedAudio { Data = File.ReadAllBytes(path) };
-        Data.EmbeddedAudio.Add(audio);
-        var flags = isOgg ? UndertaleSound.AudioEntryFlags.IsCompressed | UndertaleSound.AudioEntryFlags.Regular
-                          : UndertaleSound.AudioEntryFlags.IsEmbedded | UndertaleSound.AudioEntryFlags.Regular;
+        byte[] bytes;
+        try { bytes = File.ReadAllBytes(path); }
+        catch (Exception e)
+        {
+            Console.WriteLine($"[DR] WARN sound {name} ({from}): can't read {path} ({e.GetType().Name}: {e.Message}); skipped");
+            continue;
+        }
+        string magic = bytes.Length >= 4 ? System.Text.Encoding.ASCII.GetString(bytes, 0, 4) : "";
+        if (magic != (isOgg ? "OggS" : "RIFF"))
+        {
+            Console.WriteLine($"[DR] WARN sound {name} ({from}): {path} is not {(isOgg ? "an Ogg Vorbis" : "a RIFF WAVE")} file " +
+                              $"({bytes.Length} bytes); skipped");
+            continue;
+        }
         var snd = Data.Sounds.ByName(name);
+        string was;
         if (snd is null)
         {
+            var near = NearestSound(name);
+            if (near != null)
+                Console.WriteLine($"[DR] WARN {name} ({from}) is not a sound in this data.win - did you mean {near}? " +
+                                  "It is added as a NEW sound that only your own code plays.");
             snd = new UndertaleSound
             {
                 Name = Data.Strings.MakeString(name),
                 Volume = 1.0f, Pitch = 1.0f, Effects = 0,
             };
             Data.Sounds.Add(snd);
-            Console.WriteLine($"[DR] new sound {name}");
+            was = "new sound";
         }
+        else if (!snd.Flags.HasFlag(UndertaleSound.AudioEntryFlags.IsEmbedded) &&
+                 !snd.Flags.HasFlag(UndertaleSound.AudioEntryFlags.IsCompressed))
+            was = $"streamed sound (was {snd.File?.Content} next to data.win; now embedded, the file is untouched)";
+        else
+            was = snd.GroupID != builtin ? $"embedded sound (audio group {snd.GroupID}, moved to the default group)" : "embedded sound";
+        var audio = new UndertaleEmbeddedAudio { Data = bytes };
+        Data.EmbeddedAudio.Add(audio);
+        var flags = isOgg ? UndertaleSound.AudioEntryFlags.IsCompressed | UndertaleSound.AudioEntryFlags.Regular
+                          : UndertaleSound.AudioEntryFlags.IsEmbedded | UndertaleSound.AudioEntryFlags.Regular;
         snd.Flags = flags;
         snd.Type = Data.Strings.MakeString(isOgg ? ".ogg" : ".wav");
         snd.File = Data.Strings.MakeString(Path.GetFileName(path));
         snd.AudioFile = audio;
         snd.AudioGroup = builtinGroup;
         snd.GroupID = builtin;
+        soundsDone++;
+        Console.WriteLine($"[DR] sound {name} ({from}): {was} <- {path}");
     }
-    Console.WriteLine($"[DR] sounds OK ({sounds.Count})");
+    Console.WriteLine($"[DR] sounds OK ({soundsDone} of {sounds.Count})");
+}
+string NearestSound(string name)
+{
+    string best = null; int bd = int.MaxValue;
+    string lo = name.ToLowerInvariant();
+    foreach (var s in Data.Sounds)
+    {
+        if (s?.Name is null) continue;
+        int d = Lev(lo, s.Name.Content.ToLowerInvariant(), bd);
+        if (d < bd) { bd = d; best = s.Name.Content; }
+    }
+    return bd <= Math.Max(2, name.Length / 5) ? best : null;
 }
 
 // ---------------------------------------------------------------- code: full replacements
