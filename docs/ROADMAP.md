@@ -137,9 +137,14 @@ BepInEx sits on top of its runtime libraries.
 ## Framework tasks
 
 1. **[feature] M: after-call hooks on VM.** `VM_PushFrame` only sees the call start. Seeing the
-   end needs the interpreter's `ret`/frame-pop path, which is not yet located; the interpreter
-   loop is `0x1401D0160` in DELTARUNE. With it, `gm::` could offer post-observers and result
+   end needs the interpreter's `ret`/frame-pop path. With it, `gm::` could offer post-observers and result
    replacement on VM, as `yyc::Hook` already does on YYC.
+   **RE done (2026-11-19):** see `RE/10_vm_and_scripts.md`, "Return / frame-pop path". Frames
+   pop in the `ret`/`exit` opcode handlers (`g_VMOpHandlers[0x1C]`/`[0x1D]`, found through
+   `DoCall`'s table entry) and in `VM_PopFrame` (exception unwinding). The normal loop is
+   `0x1401D0550`; `0x1401D0160` runs only under the debugger. The recommended hook detours both
+   handlers, reading the result at `*rax` after the original, plus a `VM_PopFrame` detour for
+   dropped frames. Implementation: not started.
 2. **[feature] M: native replacement of VM scripts.** On VM, run a C++ function instead of a
    script, the counterpart of `yyc::Hook`. Possible routes:
    - a stub `CScript` whose code is a one-instruction bytecode thunk calling a registered
