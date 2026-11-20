@@ -54,6 +54,7 @@ logic.
 | [08_instances.md](08_instances.md) | Instance manager: `g_pInstanceManager`'s pointer-keyed hashmap, `Instance_UpdateObjectTypeLinks`, per-object-type lists in `g_ObjectTypeTable` |
 | [09_datawin_loader.md](09_datawin_loader.md) | The `data.win` loader: `RunnerLoadGame` → `LoadGameData` → `LoadGameData_ProcessChunks` call chain, full FORM chunk-tag table, and the universal `ReadEntireFile` primitive |
 | [10_vm_and_scripts.md](10_vm_and_scripts.md) | Script replacement / VM hooking: the `CCode`/`VMBuffer` classes holding compiled bytecode, the `Script_InvokeById`/`g_ScriptCodeTable` invocation chain, and the still-unlocated raw bytecode interpreter loop |
+| [11_file_io.md](11_file_io.md) | Runner file I/O on DELTARUNE (VM) and Dwarf Eats Mountain (YYC): `ReadEntireFile`, its bundle/sandbox wrappers, per-builtin paths, and RVA-free signatures (`tools/file_io_sigs.py`) |
 | `cheatengine/` | CE Lua resolver (`deltarune_stats.lua`) + usage/stat-reference README for gold/TP/HP |
 | `gml_builtins_manifest.json` | Machine-readable: every builtin → address, argc, aliases |
 
