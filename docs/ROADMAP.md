@@ -200,6 +200,9 @@ BepInEx sits on top of its runtime libraries.
     on YYC the counts need opt-in per-script observers.
 16. **[feature] L: live code.** Once task 4 works, "Run GML" and "replace script" behind their own
     capability, VM and YYC tested separately.
+    This is the editor's **Apply live** button (disabled today). Cards, all parked: t_fbc59e3f
+    (Apply live for GML) after t_23fb48ec (task 46), t_f4284c4a (task 42), t_ef468a92 (task 43),
+    t_122b9bb5 (task 44) and t_33d62c8a (Tier B writes); t_d740db12 for sprites/sounds (liveAssets).
 17. **[feature] M: arrays/structs, watches, freezes** (inspector tiers C/D).
 18. **[bug] S: unload safety.** The pipe workers are pinned until exit because YYToolkit's callback
     vector has no dispatch/removal synchronization (see YYToolkit task 21). Keep "disconnect only"
