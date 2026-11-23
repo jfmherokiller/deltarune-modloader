@@ -251,11 +251,13 @@ locations and code-entry evidence for each one.
 31. **[feature] M: CheatMenu flag viewer/editor.** Show `global.flag[n]` and `global.plot`, with a
     confirm step before writes. The game's flag-name table is stripped from release builds, so ship
     our own list of known flags, starting with the ones in RESEARCH.md.
-32. **[research] S: `global.debug`, encounters, room warp.**
-    - `scr_debug()` gates 136 Ch5 code entries, while `scr_debug_keycheck` is an empty stub in
-      release builds; find out what the remaining branches do.
-    - Check whether `global.encounterno` gives a usable encounter toggle.
-    - Room warp (`room_goto`) is risky for story state; decide whether it is worth offering.
+32. ~~**[research] S: `global.debug`, encounters, room warp.**~~ Researched (2026-11-22): report in
+    [`mods_examples/CheatMenu/RESEARCH.md`](../mods_examples/CheatMenu/RESEARCH.md#debug-branches-encounters-and-room-warp-roadmap-32),
+    appendices in `mods_examples/CheatMenu/research/`. Verdicts: no `scr_debug()` branch runs in
+    release and `global.debug = 1` is not a usable toggle; `global.encounterno` is a selector, but a
+    roaming-enemy toggle is possible (untested) by cancelling `obj_testoverworldenemy`; room warp is conditional
+    (save-point whitelist, visited rooms only, same world, load-style entry). Feature ratings and
+    open questions are in the report.
 33. ~~**[test] S: CheatMenu inside a battle**~~ Done: confirmed in-game by the owner (2026-11-14),
     including the freeze during the bullet phase.
 34. ~~**[test] S: DialogueBacklog in-game test**~~ Done: confirmed in-game by the owner (2026-11-14):

@@ -51,8 +51,8 @@ target scripts directly rather than flip the global.
 - In Ch3/Ch4, `undefined` in an `if` evaluates to false, and `!undefined` to true. That is
   observable: those chapters run every frame without errors, and their inverse guards (for example
   `obj_snd_maker:Step_0`, which destroys itself) behave as release code.
-- `RESEARCH.md` row `global.debug` says "`scr_debug()` returns `global.debug == 1` … 1–5". That
-  holds for Ch5 only; Ch2 needs a patched `scr_debug` (see below).
+- `RESEARCH.md` used to say "`scr_debug()` returns `global.debug == 1` … 1–5". That holds for
+  Ch5 only (now corrected there); Ch2 needs a patched `scr_debug` (see below).
 
 ### Debug helper scripts that are stubs in release
 
@@ -240,8 +240,8 @@ one known-safe branch, then restore it. Calling the target scripts directly is s
 7. Remaining roadmap 32 bullets (not covered here): `global.encounterno` as an encounter toggle,
    and whether to offer `room_goto` warps. The DOGCHECK and Home/Insert findings above feed into
    the warp decision.
-8. Follow-up: correct the `global.debug` row in `mods_examples/CheatMenu/RESEARCH.md` (Ch2 is
-   hard-coded 0; the 136 figure is Ch5-only; 1091 sites total).
+8. ~~Follow-up: correct the `global.debug` row in `mods_examples/CheatMenu/RESEARCH.md`.~~ Done
+   in the ROADMAP 32 consolidation.
 
 ## Method (reproducible)
 
