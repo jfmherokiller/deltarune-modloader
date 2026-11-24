@@ -277,7 +277,10 @@ locations and code-entry evidence for each one.
     `modloader/README.md`.
 37. **[feature] S: sprite size-change behaviour.** Decide the resize/origin rules for frames whose
     size differs from the original.
-38. **[test] S: Windows builds and the release workflow.** Not run since the thin-proxy change:
+38. ~~**[test] S: Windows builds and the release workflow.**~~ Done (2026-11-24): all four
+    `build.bat` scripts pass from a clean checkout, and `.github/workflows/release.yml` runs end to
+    end on `windows-2022` (run 45353096773, release v0.1.33, commit 2ac3034).
+    Originally not run since the thin-proxy change:
     `modloader/build.bat`, `loosemods/build.bat`, `modhost/build.bat`, `yyc_interop/build.bat`,
     `.github/workflows/release.yml`.
     - Progress (2026-11-24), modloader + loosemods done: `modloader/build.bat` and `loosemods/build.bat` both exit 0 from a clean
@@ -312,7 +315,21 @@ locations and code-entry evidence for each one.
       0 failed"), and ScriptHookDemo attached on the VM runner and finished ("demo done").
       YYCHookDemo was not run: it targets Dwarf Eats Mountain (YYC), which is not installed.
       Fix: ModHost no longer calls the deprecated `fs::u8path`, which caused three C4996
-      warnings. Still open: `release.yml`.
+      warnings.
+    - `release.yml` (2026-11-24): the push-triggered runs after the thin-proxy change already
+      passed (v0.1.31 at 13570fd, v0.1.32 at 6427ca6). Nothing in the workflow pointed at
+      obsolete artifacts: it builds `version.dll`, YYToolkit, the example `DeltaruneYYTK` plugin
+      (shipped as `.example`), LooseMods, ModHost and the compiler, and `package_release.py`
+      fails on any missing one. Changes in 2ac3034: actions moved to Node 24 majors
+      (`checkout@v7`, `setup-msbuild@v3`, `setup-dotnet@v6`; this removes the Node 20
+      deprecation annotation), the header comment now describes the thin-proxy build, and the
+      release notes list the example mods from the zip (`_DialogueBacklog` was missing). v0.1.33
+      has the same 180 entries as v0.1.32: `version.dll`, `mods/native/AurieCore.dll`,
+      `mods/aurie/{YYToolkit,LooseMods,ModHost}.dll`, `DeltaruneYYTK.dll.example`, tools,
+      compiler, `modloader.ini` and the three example mods. The CI `version.dll` exports the 16
+      `version.def` functions and imports only KERNEL32. The yyc_interop demos and HelloPlugin
+      are not in the zip (examples, by design). Follow-up: when the uncommitted modhost /
+      yyc_interop WIP lands (new sources, PostHookDemo), check that CI still passes.
 39. ~~**[feature] S: `log_scripts` for scripts too.**~~ Done (2026-11-17): `log_scripts` now
     also logs script calls through `gm::Observe("")` (VM), and tags each line with the loose
     mod that provides the code; `log_scripts=2` logs mod code only. Verified on the launcher
