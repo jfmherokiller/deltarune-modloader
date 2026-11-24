@@ -12,6 +12,10 @@ if not exist "%VCVARS%" (
 call "%VCVARS%" >nul || exit /b 1
 set "ROOT=%~dp0.."
 set "YY=%ROOT%\external\YYToolkit\YYToolkit"
+if not exist "%YY%\include" (
+  echo external\YYToolkit is missing: run  git submodule update --init external/YYToolkit
+  exit /b 1
+)
 cd /d "%~1" || exit /b 1
 set "NAME=%~2"
 shift & shift
@@ -23,7 +27,7 @@ shift
 goto args
 :build
 if not exist build mkdir build
-cl /nologo /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=1 /Fobuild\ /Fdbuild\ ^
+cl /nologo /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=1 /D_CRT_SECURE_NO_WARNINGS /Fobuild\ /Fdbuild\ ^
    /I "%ROOT%\modloader\yyc_interop\include" /I "%YY%\include" /I "%YY%\source\YYTK\Shared" ^
    /I "%ROOT%\modloader\yytk_probe\stub" /I "%ROOT%\modloader\include" ^
    %SRCS% "%YY%\source\YYTK\Shared\YYTK_Shared_Types.cpp" ^

@@ -280,6 +280,22 @@ locations and code-entry evidence for each one.
 38. **[test] S: Windows builds and the release workflow.** Not run since the thin-proxy change:
     `modloader/build.bat`, `loosemods/build.bat`, `modhost/build.bat`, `yyc_interop/build.bat`,
     `.github/workflows/release.yml`.
+    - Progress (2026-11-24), modloader + loosemods done: `modloader/build.bat` and `loosemods/build.bat` both exit 0 from a clean
+      checkout with no warnings. Tested with MSVC 14.44 (VS 2022) and SDK 10.0.26100, run through
+      wine `cmd` using `VSINSTALLDIR`. The vswhere lookup can't run under wine, so it is untested;
+      it is the stock pattern. The matching `build.sh` scripts pass too. Artifacts:
+      - `modloader/build/version.dll` (+ `.pdb`, `.lib`): exports exactly the 16 `version.dll`
+        functions in `src/version.def` and imports only `KERNEL32.dll`, as the thin-proxy design
+        requires.
+      - `modloader/loosemods/build/LooseMods.dll` (+ `.pdb`, `.lib`): exports `ModuleInitialize`,
+        `ModulePreinitialize`, `__AurieFrameworkInit`, `__AurieIsDebugBuild` and `DllMain`.
+        Imports USER32, KERNEL32, and the dynamic CRT (`/MD`: MSVCP140, VCRUNTIME140(_1), api-ms-win-crt-*).
+      Fixes: `.gitattributes` checks out `*.bat` as CRLF, because cmd.exe can misparse labels in
+      LF files (`build_yytk_plugin.bat` uses `goto`). `build_yytk_plugin` now fails clearly when
+      the `external/YYToolkit` submodule is missing, and sets `/D_CRT_SECURE_NO_WARNINGS` like
+      `build.bat`. Tracked `*.sh` files are now executable; before, `loosemods/build.sh` failed
+      with "Permission denied". Still open: `modhost/build.bat`, `yyc_interop/build.bat`,
+      `release.yml`.
 39. ~~**[feature] S: `log_scripts` for scripts too.**~~ Done (2026-11-17): `log_scripts` now
     also logs script calls through `gm::Observe("")` (VM), and tags each line with the loose
     mod that provides the code; `log_scripts=2` logs mod code only. Verified on the launcher

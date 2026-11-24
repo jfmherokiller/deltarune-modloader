@@ -7,9 +7,10 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DIR="$1"; NAME="$2"; shift 2
 source "$ROOT/tools/clang-cl-env.sh"
 YY="$ROOT/external/YYToolkit/YYToolkit"
+[[ -d "$YY/include" ]] || { echo "external/YYToolkit is missing: run  git submodule update --init external/YYToolkit" >&2; exit 1; }
 cd "$DIR"
 mkdir -p build
-clang-cl "${CLCOMMON[@]}" /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=1 /Fobuild/ \
+clang-cl "${CLCOMMON[@]}" /std:c++latest /EHa /O2 /MD /W3 /LD /DNDEBUG /DYYTK_DEFINE_INTERNAL=1 /D_CRT_SECURE_NO_WARNINGS /Fobuild/ \
     /I "$ROOT/modloader/yyc_interop/include" /I "$YY/include" /I "$YY/source/YYTK/Shared" \
     /I "$ROOT/modloader/yytk_probe/stub" /I "$ROOT/modloader/include" \
     "$@" "$YY/source/YYTK/Shared/YYTK_Shared_Types.cpp" \
