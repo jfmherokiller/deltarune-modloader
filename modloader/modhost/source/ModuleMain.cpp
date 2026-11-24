@@ -40,6 +40,12 @@ namespace
 		return s;
 	}
 
+	// Manifest strings are UTF-8. fs::u8path does this too, but is deprecated in C++20.
+	fs::path Utf8Path(const std::string& s)
+	{
+		return fs::path(std::u8string_view(reinterpret_cast<const char8_t*>(s.data()), s.size()));
+	}
+
 	std::wstring Lower(std::wstring s)
 	{
 		for (auto& c : s)
@@ -98,7 +104,7 @@ namespace
 		if (m.version.empty())
 			m.version = "0";
 		std::error_code ec;
-		m.dllExists = !m.dll.empty() && fs::is_regular_file(dir / fs::u8path(m.dll), ec);
+		m.dllExists = !m.dll.empty() && fs::is_regular_file(dir / Utf8Path(m.dll), ec);
 		return m;
 	}
 
@@ -216,10 +222,10 @@ EXPORTED AurieStatus ModuleInitialize(IN AurieModule* Module, IN const fs::path&
 
 		Loaded& p = g_Plugins.emplace_back();
 		p.manifest = m;
-		fs::path folder = plugins / fs::u8path(m.dir);
+		fs::path folder = plugins / Utf8Path(m.dir);
 		p.folder = folder.wstring();
 		p.config = (folder / L"config.ini").wstring();
-		p.dllPath = (folder / fs::u8path(m.dll)).wstring();
+		p.dllPath = (folder / Utf8Path(m.dll)).wstring();
 		// Fill the info before mapping: the plugin may ask for it from its own init routines.
 		p.info = { p.manifest.id.c_str(), p.manifest.name.c_str(), p.manifest.version.c_str(),
 			p.folder.c_str(), p.config.c_str() };

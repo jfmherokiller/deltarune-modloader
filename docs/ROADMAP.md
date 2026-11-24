@@ -294,8 +294,25 @@ locations and code-entry evidence for each one.
       LF files (`build_yytk_plugin.bat` uses `goto`). `build_yytk_plugin` now fails clearly when
       the `external/YYToolkit` submodule is missing, and sets `/D_CRT_SECURE_NO_WARNINGS` like
       `build.bat`. Tracked `*.sh` files are now executable; before, `loosemods/build.sh` failed
-      with "Permission denied". Still open: `modhost/build.bat`, `yyc_interop/build.bat`,
-      `release.yml`.
+      with "Permission denied".
+    - Progress (2026-11-24), modhost + yyc_interop done: `modhost/build.bat` and
+      `yyc_interop/build.bat` both exit 0 from a clean checkout, same toolchain and wine setup.
+      Artifacts:
+      - `modloader/modhost/build/ModHost.dll` (+ `.pdb`, `.lib`): goes to `mods\aurie\`
+        (`tools/package_release.py` picks it up; `release.yml` builds it).
+      - `modloader/modhost/build/HelloPlugin.dll` (+ `.pdb`, `.lib`): example plugin, goes to
+        `mods\plugins\HelloPlugin\` with `modhost/example/plugin.ini`. Not in the release zip.
+      - `modloader/yyc_interop/build/YYCHookDemo.dll` and `ScriptHookDemo.dll` (+ `.pdb`, `.lib`):
+        example Aurie modules for `mods\aurie\`. Not in the release zip, and `release.yml` does
+        not build them.
+      All four export `ModuleInitialize`, `__AurieFrameworkInit`, `__AurieIsDebugBuild` and
+      `DllMain`, and import USER32, KERNEL32 and the dynamic CRT. Load test on the thin-proxy
+      layout (MSVC `version.dll` + AurieCore + YYToolkit + LooseMods + ModHost +
+      ScriptHookDemo, launcher under Proton): ModHost loaded HelloPlugin ("1 loaded, 0 skipped,
+      0 failed"), and ScriptHookDemo attached on the VM runner and finished ("demo done").
+      YYCHookDemo was not run: it targets Dwarf Eats Mountain (YYC), which is not installed.
+      Fix: ModHost no longer calls the deprecated `fs::u8path`, which caused three C4996
+      warnings. Still open: `release.yml`.
 39. ~~**[feature] S: `log_scripts` for scripts too.**~~ Done (2026-11-17): `log_scripts` now
     also logs script calls through `gm::Observe("")` (VM), and tags each line with the loose
     mod that provides the code; `log_scripts=2` logs mod code only. Verified on the launcher
