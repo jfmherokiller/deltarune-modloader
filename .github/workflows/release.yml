@@ -1,7 +1,9 @@
 name: release
 
-# Every push to main builds the loader, YYToolkit (fork submodule) and the example plugin
-# from source, then publishes a GitHub release tagged v0.<run number>.<attempt>... see "version".
+# Every push to main (or a manual run) builds from source: the thin version.dll bootstrap,
+# YYToolkit (fork submodule), the LooseMods and ModHost Aurie modules, the example YYTK plugin
+# and the loose-mod compiler; fetches AurieCore v2.0.2, packages the zip with
+# tools/package_release.py and publishes a release tagged with the next vX.Y.Z (see "Version").
 on:
   push:
     branches: [main]
@@ -22,7 +24,7 @@ jobs:
   build:
     runs-on: windows-2022
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           submodules: recursive
           fetch-depth: 0
@@ -40,7 +42,7 @@ jobs:
           echo "last=$last" >> "$GITHUB_OUTPUT"
           echo "version $ver (previous $last)"
 
-      - uses: microsoft/setup-msbuild@v2
+      - uses: microsoft/setup-msbuild@v3
 
       - name: Build loader (version.dll)
         shell: cmd
@@ -60,7 +62,7 @@ jobs:
           call modloader\loosemods\build.bat || exit /b 1
           call modloader\modhost\build.bat
 
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: "10.0.x"
 
@@ -91,7 +93,8 @@ jobs:
             echo "Automatic build of \`${GITHUB_SHA::7}\`. Extract into the DELTARUNE folder, next to \`DELTARUNE.exe\`."
             echo
             echo "Loose \`.gml\`/sprite/sound mods are compiled by the bundled \`mods/tools/compiler/\` (UndertaleModLib 0.9.2.0, GPL-3.0; Underanalyzer, MPL-2.0); UTMT CLI is only needed for \`export_sprites\`."
-            echo "Example mods are included disabled (\`mods/_CheatMenu\`, \`mods/_SpriteInspector\`); remove the \`_\` to enable."
+            examples=$(python -c "import sys, zipfile; n = zipfile.ZipFile(sys.argv[1]).namelist(); print(', '.join(sorted({'\`mods/' + p.split('/')[1] + '\`' for p in n if p.startswith('mods/_') and p.count('/') > 1})))" "out/deltarune-modloader-${{ steps.version.outputs.tag }}.zip")
+            echo "Example mods are included disabled ($examples); remove the \`_\` to enable."
             echo
             echo "YYToolkit is built from the [fork](https://github.com/jfmherokiller/YYToolkit/tree/fix/vm-room-data-non-inlined) (AGPL-3.0); AurieCore is the unmodified Aurie v2.0.2 release."
             echo
